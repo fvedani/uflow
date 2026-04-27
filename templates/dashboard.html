@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — UFLOW{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-subtitle">KPI aggregati, andamento storico e salute del portafoglio clienti</p>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    {% if current_user.is_admin %}
+    <form method="post" action="/admin/reset-demo" style="margin:0"
+          onsubmit="return confirm('Vuoi ripristinare i dati demo? I tuoi dati reali non verranno toccati.')">
+      <button type="submit" class="btn" style="background:var(--surface2);color:var(--text-muted);border:1px solid var(--border);font-size:12px;padding:6px 12px">
+        🔄 Ripristina demo
+      </button>
+    </form>
+    {% endif %}
+    <a href="/simulatore" class="btn btn-primary">⚡ Nuova simulazione</a>
+  </div>
+</div>
+
+{% if n_sim == 0 %}
+<div class="card">
+  <div class="empty">
+    <div class="empty-icon">📊</div>
+    <div class="empty-title">Nessuna simulazione ancora</div>
+    <div class="empty-sub">Vai al <a href="/simulatore" style="color:var(--accent2)">Simulatore</a> per calcolare il tuo primo margine. I KPI, i grafici e l'andamento storico appariranno automaticamente.</div>
+  </div>
+</div>
+{% else %}
+
+<!-- ── Banner contestuale (solo se dati demo presenti) ────────────────────── -->
+<div style="padding:14px 18px;margin-bottom:20px;border-radius:10px;
+     background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(168,85,247,.05));
+     border:1px solid rgba(16,185,129,.18);display:flex;align-items:center;gap:14px">
+  <div style="font-size:20px;flex-shrink:0">🎯</div>
+  <div>
+    <div style="font-weight:600;font-size:13px;color:var(--accent3)">Piattaforma operativa per il mercato libero energia</div>
+    <div style="font-size:12px;color:var(--text3);margin-top:3px;line-height:1.6">
+      Qui vedi l'aggregato di tutte le simulazioni: usa il
+      <a href="/simulatore" style="color:var(--accent2);font-weight:500">Simulatore</a> per calcolare nuovi margini,
+      <a href="/portafogli" style="color:var(--accent2);font-weight:500">Portafogli</a> per monitorare i clienti,
+      <a href="/confronto" style="color:var(--accent2);font-weight:500">Confronto scenari</a> per comparare offerte affiancate.
+    </div>
+  </div>
+</div>
+
+<!-- ── KPI principali ──────────────────────────────────────────────────────── -->
+<div class="stat-grid stat-grid-4" style="margin-bottom:24px">
+  <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.5)">
+    <div class="stat-label">Simulazioni totali</div>
+    <div class="stat-value color-accent">{{ n_sim }}</div>
+    <div class="stat-sub" style="display:flex;align-items:center;gap:5px">
+      nel periodo selezionato
+      {% if delta_n_sim != 0 %}
+      <span style="font-size:11px;font-weight:600;margin-left:4px;
+        color:{{ 'var(--green)' if delta_n_sim > 0 else 'var(--red)' }}">
+        {{ '↑' if delta_n_sim > 0 else '↓' }}{{ delta_n_sim|abs }} vs sett. prec.
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="stat-card" style="border-top:2px solid {{ 'rgba(16,185,129,.5)' if avg_netto >= 0 else 'rgba(239,68,68,.5)' }}">
+    <div class="stat-label">Margine netto medio</div>
+    <div class="stat-value {{ 'color-green' if avg_netto >= 0 else 'color-red' }}">
+      € {{ avg_netto|n2 }}
+    </div>
+    <div class="stat-sub" style="display:flex;align-items:center;gap:5px">
+      per cliente / anno
+      {% if delta_avg_netto is not none and delta_avg_netto != 0 %}
+      <span style="font-size:11px;font-weight:600;margin-left:4px;
+        color:{{ 'var(--green)' if delta_avg_netto > 0 else 'var(--red)' }}">
+        {{ '↑' if delta_avg_netto > 0 else '↓' }} € {{ delta_avg_netto|abs|n2 }}
+      </span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="stat-card" style="border-top:2px solid rgba(148,163,184,.25)">
+    <div class="stat-label">Margine lordo medio</div>
+    <div class="stat-value color-text">
+      € {{ avg_lordo|n2 }}
+    </div>
+    <div class="stat-sub">prima delle provvigioni</div>
+  </div>
+  {% if ratio_netto_provv is not none %}
+  {% set r_color = 'rgba(16,185,129,.5)' if ratio_netto_provv >= 2 else ('rgba(245,158,11,.5)' if ratio_netto_provv >= 1 else 'rgba(239,68,68,.5)') %}
+  {% set r_cls   = 'color-green'        if ratio_netto_provv >= 2 else ('color-orange'        if ratio_netto_provv >= 1 else 'color-red') %}
+  <div class="stat-card" style="border-top:2px solid {{ r_color }}"
+       title="Indica quante volte il margine netto copre le provvigioni pagate. Valore ideale ≥ 2">
+    <div class="stat-label">Netto / Provvigioni</div>
+    <div class="stat-value {{ r_cls }}">{{ ratio_netto_provv|n2 }}×</div>
+    <div class="stat-sub">
+      {% if ratio_netto_provv >= 2 %}ottimo — il netto supera 2× le provvigioni
+      {% elif ratio_netto_provv >= 1 %}sufficiente — netto ≥ provvigioni
+      {% else %}critico — provvigioni erodono il netto
+      {% endif %}
+    </div>
+  </div>
+  {% else %}
+  <div class="stat-card" style="border-top:2px solid rgba(148,163,184,.2)">
+    <div class="stat-label">Netto / Provvigioni</div>
+    <div class="stat-value color-text">—</div>
+    <div class="stat-sub">nessuna provvigione registrata</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── Risorse disponibili + Breakdown commodity ──────────────────────────── -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+
+  <!-- Anagrafica -->
+  <div class="card card-body">
+    <div class="section-title">Anagrafica</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px">
+      <a href="/offerte" style="text-decoration:none">
+        <div class="stat-card" style="padding:14px;cursor:pointer;transition:border-color .15s"
+             onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div class="stat-label" style="font-size:10px">Offerte attive</div>
+          <div class="stat-value color-accent" style="font-size:20px">{{ n_offerte }}</div>
+        </div>
+      </a>
+      <a href="/fornitori" style="text-decoration:none">
+        <div class="stat-card" style="padding:14px;cursor:pointer;transition:border-color .15s"
+             onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div class="stat-label" style="font-size:10px">Fornitori</div>
+          <div class="stat-value color-text" style="font-size:20px">{{ n_fornitori }}</div>
+        </div>
+      </a>
+      <a href="/provvigioni" style="text-decoration:none">
+        <div class="stat-card" style="padding:14px;cursor:pointer;transition:border-color .15s"
+             onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div class="stat-label" style="font-size:10px">Piani prov.</div>
+          <div class="stat-value color-text" style="font-size:20px">{{ n_piani }}</div>
+        </div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Breakdown commodity con donut -->
+  <div class="card card-body">
+    <div class="section-title">Breakdown per commodity</div>
+    <div style="display:flex;align-items:center;gap:16px;margin-top:4px">
+      <!-- Donut chart -->
+      <div style="position:relative;width:110px;height:110px;flex-shrink:0">
+        <canvas id="chartDonut" width="110" height="110"></canvas>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+          <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--text)">{{ n_sim }}</div>
+          <div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3)">totale</div>
+        </div>
+      </div>
+      <!-- Stats affiancate -->
+      <div style="flex:1;display:flex;flex-direction:column;gap:10px">
+        <div style="padding:10px 12px;border-radius:8px;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2)">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--orange);margin-bottom:4px">🔆 Luce</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:20px;font-weight:700;font-family:var(--mono);color:var(--orange)">{{ n_luce }}</span>
+            {% if n_luce > 0 %}
+            <span class="mono {{ 'color-green' if luce_avg >= 0 else 'color-red' }}" style="font-size:12px">
+              Ø € {{ luce_avg|n2 }}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+        <div style="padding:10px 12px;border-radius:8px;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2)">
+          <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--accent2);margin-bottom:4px">🔥 Gas</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:20px;font-weight:700;font-family:var(--mono);color:var(--accent2)">{{ n_gas }}</span>
+            {% if n_gas > 0 %}
+            <span class="mono {{ 'color-green' if gas_avg >= 0 else 'color-red' }}" style="font-size:12px">
+              Ø € {{ gas_avg|n2 }}
+            </span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Grafico distribuzione + Top 3 ──────────────────────────────────────── -->
+<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:20px">
+
+  <!-- Grafico margini storici -->
+  <div class="card card-body">
+    <div class="section-title">Margini storici (ultime simulazioni)</div>
+    <div style="position:relative;height:220px">
+      <canvas id="chartStorico"></canvas>
+    </div>
+  </div>
+
+  <!-- Top 3 simulazioni -->
+  <div class="card card-body">
+    <div class="section-title">🏆 Top 3 per margine netto</div>
+    {% for s in top3 %}
+    <div style="padding:12px 0;{{ 'border-bottom:1px solid var(--border)' if not loop.last }}">
+      <div class="flex justify-between items-center">
+        <div>
+          <div style="font-weight:600;font-size:13px">{{ s.nome_offerta or '—' }}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">
+            {{ s.nome_fornitore or '—' }} · {{ s.nome_piano or '—' }}
+            <span class="badge {{ 'badge-orange' if s.commodity == 'LUCE' else 'badge-blue' }}" style="margin-left:4px">{{ s.commodity }}</span>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="mono fw-600 {{ 'color-green' if s.margine_netto >= 0 else 'color-red' }}" style="font-size:15px">
+            € {{ s.margine_netto|n2 }}
+          </div>
+          <div style="font-size:11px;color:var(--text3)">{{ (s.margine_percentuale or 0)|n1 }}% del lordo</div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- ── Portafogli semaforo ───────────────────────────────────────────────────── -->
+{% if portafogli_dash %}
+<div class="card card-body" style="margin-bottom:24px">
+  <div class="flex justify-between items-center" style="margin-bottom:16px">
+    <div class="section-title" style="margin:0">Salute portafogli</div>
+    <a href="/portafogli" class="btn btn-secondary btn-sm" style="font-size:11px">Tutti →</a>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    {% for pf in portafogli_dash %}
+    {% set sem_color = 'var(--green)' if pf.semaforo=='green' else ('var(--orange)' if pf.semaforo=='yellow' else 'var(--red)') %}
+    {% set sem_bg    = 'rgba(16,185,129,.06)' if pf.semaforo=='green' else ('rgba(245,158,11,.06)' if pf.semaforo=='yellow' else 'rgba(239,68,68,.06)') %}
+    {% set sem_border= 'rgba(16,185,129,.18)' if pf.semaforo=='green' else ('rgba(245,158,11,.18)' if pf.semaforo=='yellow' else 'rgba(239,68,68,.18)') %}
+    <a href="/portafogli/{{ pf.id }}" style="text-decoration:none;display:flex;align-items:center;justify-content:space-between;
+       padding:11px 14px;background:{{ sem_bg }};border-radius:9px;border:1px solid {{ sem_border }};transition:filter .15s"
+       onmouseover="this.style.filter='brightness(1.2)'" onmouseout="this.style.filter=''">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:8px;height:8px;border-radius:50%;background:{{ sem_color }};box-shadow:0 0 6px {{ sem_color }};flex-shrink:0"></div>
+        <div>
+          <div style="font-weight:600;font-size:13px;color:var(--text)">{{ pf.nome }}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:1px">
+            {{ pf.n_clienti or 0 }} clienti
+            {% if pf.n_negativi %} · <span style="color:var(--red)">{{ pf.n_negativi }} negativi</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="mono fw-600" style="color:{{ sem_color }};font-size:13px">
+          € {{ (pf.tot_netto or 0)|n2 }}
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">
+          {% if pf.pct_negativi and pf.pct_negativi > 0 %}{{ pf.pct_negativi }}% negativi{% else %}tutti in positivo{% endif %}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Ultime simulazioni ─────────────────────────────────────────────────── -->
+<div class="card" style="margin-bottom:8px">
+  <div class="card-header">
+    <span style="font-weight:600;font-size:14px">Ultime simulazioni</span>
+    <a href="/simulatore" class="btn btn-secondary btn-sm">Apri simulatore →</a>
+  </div>
+  <div class="overflow-x">
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th><th>Offerta</th><th>Fornitore</th><th>Comm.</th>
+          <th style="text-align:right">M. Lordo</th>
+          <th style="text-align:right">M. Netto</th>
+          <th style="text-align:right">M. %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in recenti %}
+        <tr>
+          <td style="font-size:11.5px;color:var(--text3);white-space:nowrap">{{ (s.created_at or '')[:16].replace('T',' ') }}</td>
+          <td style="font-weight:600">{{ s.nome_offerta or '—' }}</td>
+          <td style="color:var(--text2);font-size:12.5px">{{ s.nome_fornitore or '—' }}</td>
+          <td><span class="badge {{ 'badge-orange' if s.commodity == 'LUCE' else 'badge-blue' }}">{{ s.commodity or '—' }}</span></td>
+          <td class="mono" style="text-align:right;color:var(--text2)">€ {{ (s.margine_lordo or 0)|n2 }}</td>
+          <td class="mono fw-600 {{ 'color-green' if (s.margine_netto or 0) >= 0 else 'color-red' }}" style="text-align:right">
+            € {{ (s.margine_netto or 0)|n2 }}
+          </td>
+          <td class="mono" style="text-align:right;color:var(--text3)">{{ (s.margine_percentuale or 0)|n1 }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if n_sim > 0 %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const CHT = { /* palette condivisa */
+  grid:'rgba(255,255,255,.04)', tick:'#4a4a60',
+  lordo:'rgba(16,185,129,.55)', netto_pos:'rgba(16,185,129,.8)', netto_neg:'rgba(239,68,68,.8)',
+  line:'#6366f1', fill:'rgba(16,185,129,.08)',
+  tooltip:{bg:'#13131a',border:'rgba(16,185,129,.25)',title:'#eeeef2',body:'#9898a8'}
+};
+const pluginTooltip = {
+  backgroundColor:CHT.tooltip.bg, borderColor:CHT.tooltip.border, borderWidth:1,
+  titleColor:CHT.tooltip.title, bodyColor:CHT.tooltip.body,
+  padding:10, cornerRadius:8, displayColors:false
+};
+
+// ── Donut commodity ──────────────────────────────────────────────────────────
+const nLuce = {{ n_luce }}, nGas = {{ n_gas }};
+if(document.getElementById('chartDonut') && (nLuce + nGas) > 0){
+  new Chart(document.getElementById('chartDonut'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Luce', 'Gas'],
+      datasets: [{
+        data: [nLuce, nGas],
+        backgroundColor: ['rgba(245,158,11,.7)', 'rgba(16,185,129,.7)'],
+        borderColor: ['rgba(245,158,11,.9)', 'rgba(16,185,129,.9)'],
+        borderWidth: 1.5,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      cutout: '68%',
+      responsive: false,
+      animation: {duration:500,easing:'easeOutQuart'},
+      plugins: {
+        legend: {display:false},
+        tooltip: {
+          ...pluginTooltip,
+          callbacks: {
+            label: c => `${c.label}: ${c.raw} sim. (${fmtIT((c.raw/(nLuce+nGas))*100, 0)}%)`
+          }
+        }
+      }
+    }
+  });
+}
+
+const recenti = {{ recenti|tojson }};
+const sorted  = [...recenti].reverse();
+const labels  = sorted.map(s => (s.created_at || '').substring(5,16).replace('T',' '));
+
+new Chart(document.getElementById('chartStorico'), {
+  type: 'bar',
+  data: {
+    labels,
+    datasets: [
+      {
+        label: 'M. Lordo',
+        data: sorted.map(s => s.margine_lordo),
+        backgroundColor: CHT.lordo,
+        borderRadius: 5, borderSkipped: false, order: 2
+      },
+      {
+        label: 'M. Netto',
+        data: sorted.map(s => s.margine_netto),
+        backgroundColor: sorted.map(s => s.margine_netto >= 0 ? CHT.netto_pos : CHT.netto_neg),
+        borderRadius: 5, borderSkipped: false, order: 1
+      }
+    ]
+  },
+  options: {
+    animation: {duration:600,easing:'easeOutQuart'},
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: {labels:{color:CHT.tick, font:{size:11}, boxWidth:10, boxHeight:10}},
+      tooltip: {
+        ...pluginTooltip,
+        callbacks: { label: c => c.dataset.label + ': ' + fmtEuro(c.raw) }
+      }
+    },
+    scales: {
+      x: {ticks:{color:CHT.tick,font:{size:10}}, grid:{display:false}, border:{display:false}},
+      y: {
+        ticks:{color:CHT.tick, font:{size:10}, callback: v => '€'+(Math.abs(v)>=1000?fmtIT(v/1000,1)+'k':fmtIT(v,0))},
+        grid:{color:CHT.grid}, border:{display:false}
+      }
+    }
+  }
+});
+
+</script>
+{% endif %}
+{% endblock %}

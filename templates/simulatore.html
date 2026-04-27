@@ -1,0 +1,861 @@
+{% extends "base.html" %}
+{% block title %}Simulatore — UFLOW{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Simulatore margini</h1>
+    <p class="page-subtitle">Calcola spread, quota fissa, provvigioni e margine netto su qualsiasi offerta luce o gas</p>
+  </div>
+</div>
+
+<!-- ── Selettori ──────────────────────────────────────────────────────────── -->
+<div class="card card-body" style="margin-bottom:20px;border-top:2px solid rgba(16,185,129,.4)">
+  <div class="form-grid form-grid-3" style="margin-bottom:16px">
+    <div class="form-group">
+      <label title="Contratto di Tipo Energetico — definisce spread di vendita e quota fissa applicati al cliente">Offerta commerciale <span style="color:var(--text3);font-size:10px">ℹ</span></label>
+      <select id="selOfferta" onchange="onOffertaChange()">
+        <option value="">— Seleziona offerta —</option>
+        {% for o in offerte %}
+        <option value="{{ o.id }}"
+          data-consumo="{{ o.consumo_medio }}"
+          data-commodity="{{ o.commodity }}"
+          data-tipo="{{ o.tipo_consumo }}"
+          data-spread="{{ o.spread }}"
+          data-qf="{{ o.quota_fissa }}">
+          {{ o.nome_offerta }} ({{ o.commodity }})
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label title="Il fornitore determina lo spread di acquisto e il costo di gestione del PdP (punto di prelievo)">Fornitore all'ingrosso <span id="fornitoreLabel" style="color:var(--text3);font-size:10px;margin-left:4px"></span></label>
+      {% if is_admin %}
+      <select id="selFornitore" onchange="onFornitoreChange()">
+        <option value="">— Media automatica (nessun fornitore) —</option>
+        {% for f in fornitori %}
+        <option value="{{ f.id }}"
+          data-commodity="{{ f.commodity }}"
+          data-spread="{{ f.spread_acquisto }}"
+          data-costo="{{ f.costo_gestione_pdp }}">
+          {{ f.nome }} ({{ f.commodity }})
+        </option>
+        {% endfor %}
+      </select>
+      {% else %}
+      {# Non-admin: sempre media automatica, select nascosto #}
+      <input type="hidden" id="selFornitore" value="">
+      <div class="alert alert-info" style="margin-bottom:0;padding:7px 11px">
+        ℹ️ Viene usata automaticamente la <strong>media dei fornitori</strong> per questa commodity.
+      </div>
+      {% endif %}
+    </div>
+    <div class="form-group">
+      <label title="Struttura delle provvigioni: gettone una tantum all'attivazione + ricorrenti mensili o sul consumo">Piano provvigionale agente <span style="color:var(--text3);font-size:10px">ℹ</span></label>
+      <select id="selPiano" onchange="simulaAuto()">
+        <option value="">— Seleziona piano —</option>
+        {% for p in piani %}
+        <option value="{{ p.id }}">{{ p.nome_piano }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <!-- Info strip -->
+  <div id="infoStrip" style="display:none;padding-top:14px;border-top:1px solid var(--border)">
+    <div class="flex gap-2 items-center flex-wrap" style="margin-bottom:10px">
+      <div class="form-group" style="min-width:200px;margin-bottom:0">
+        <label>Consumo medio (<span id="unitLabel">MWh</span>) — override opzionale</label>
+        <input type="number" id="inputConsumo" step="0.01" placeholder=""
+               oninput="simulaDebounced()">
+      </div>
+      <span class="chip" id="chipTipo"><span>Tipo:</span>—</span>
+      <span class="chip" id="chipSpreadV"><span>Spread vendita:</span>—</span>
+      <span class="chip" id="chipQF"><span>QF vendita:</span>—</span>
+      <span class="chip" id="chipSpreadA"><span>Spread acquisto:</span>—</span>
+      <span class="chip" id="chipCosto"><span>Costo PdP:</span>—</span>
+    </div>
+    <!-- Banner fornitore medio -->
+    <div id="bannerFornitoreMedia" class="alert alert-info" style="display:none;margin-bottom:8px">
+      ℹ️ Nessun fornitore selezionato — verrà usata la <strong>media automatica</strong> dei fornitori disponibili per questa commodity.
+    </div>
+    <!-- Warnings -->
+    <div id="warnSpread" class="alert alert-warning" style="display:none">
+      ⚠️ <strong>Attenzione:</strong> lo spread di vendita è inferiore a quello di acquisto — margine spread negativo.
+    </div>
+    <div id="warnLordo" class="alert alert-danger" style="display:none">
+      ❌ <strong>Attenzione:</strong> il margine lordo è negativo. Verifica i parametri dell'offerta e del fornitore.
+    </div>
+  </div>
+
+  <!-- Pulsante Calcola -->
+  <div style="padding-top:14px;border-top:1px solid var(--border);margin-top:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <button class="btn btn-primary" id="btnCalcola" onclick="simula()" style="min-width:130px">
+      ⚡ Calcola
+    </button>
+    <span style="font-size:12px;color:var(--text3)">
+      Oppure modifica i parametri per ricalcolare automaticamente
+    </span>
+  </div>
+</div>
+
+<!-- ── Empty state ─────────────────────────────────────────────────────────── -->
+<div id="emptyState" class="card">
+  <div class="empty">
+    <div class="empty-icon">⚡</div>
+    <div class="empty-title">Configura la simulazione e clicca Calcola</div>
+    <div class="empty-sub">Il simulatore calcola: <strong style="color:var(--text2)">margine spread</strong> (differenza tra spread vendita e acquisto × consumo annuo) + <strong style="color:var(--text2)">margine quota fissa</strong> (QF netta × 12 mesi) − <strong style="color:var(--text2)">provvigioni agente</strong> = <strong style="color:var(--text2)">margine netto</strong>.<br><br>Il fornitore è opzionale: se omesso viene usata la media dei fornitori disponibili per la commodity selezionata.</div>
+  </div>
+</div>
+
+<!-- ── Risultati ───────────────────────────────────────────────────────────── -->
+<div id="results" style="display:none">
+
+  <!-- Banner "caricato da storico" con download -->
+  <div id="storicoLoadedBanner" style="display:none;margin-bottom:16px">
+    <div style="padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;
+         background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.2);border-radius:10px">
+      <span style="font-size:12px;color:var(--accent3)">📂 Visualizzando una simulazione dallo storico</span>
+      <div class="flex gap-2">
+        <a id="btnDownloadSim" href="#" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:11px">📥 Excel</a>
+        <a id="btnDownloadPdf" href="#" class="btn btn-secondary btn-sm" style="white-space:nowrap;font-size:11px">🖨 PDF</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI row -->
+  <div class="stat-grid stat-grid-4" style="margin-bottom:20px">
+    <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.45)">
+      <div class="stat-label">Margine spread annuo</div>
+      <div class="stat-value color-accent" id="kpiSpread">—</div>
+    </div>
+    <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.3)">
+      <div class="stat-label">Margine QF annuo</div>
+      <div class="stat-value color-accent" id="kpiQF">—</div>
+    </div>
+    <div class="stat-card" id="kpiScontoCard" style="border-top:2px solid rgba(239,68,68,.4);display:none">
+      <div class="stat-label">Sconto cliente</div>
+      <div class="stat-value color-red" id="kpiSconto">—</div>
+    </div>
+    <div class="stat-card" style="border-top:2px solid rgba(148,163,184,.25)">
+      <div class="stat-label">Margine lordo</div>
+      <div class="stat-value color-text" id="kpiLordo">—</div>
+    </div>
+    <div class="stat-card" id="kpiNettoCard" style="border-top:2px solid rgba(16,185,129,.5)">
+      <div class="stat-label">Margine netto</div>
+      <div class="stat-value" id="kpiNetto">—</div>
+      <div class="stat-sub" id="kpiPct">—</div>
+    </div>
+  </div>
+
+  <!-- Provvigioni + Grafico -->
+  <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:16px;margin-bottom:20px">
+    <div class="card card-body">
+      <div class="section-title">Provvigioni</div>
+      <div class="flex justify-between items-center" style="padding:11px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text2);font-size:13px">Agente</span>
+        <span class="mono fw-600" style="color:var(--accent2)" id="provAgente">—</span>
+      </div>
+      <div class="flex justify-between items-center" style="padding:11px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text2);font-size:13px">Sub-Agente</span>
+        <span class="mono fw-600" style="color:var(--purple)" id="provSub">—</span>
+      </div>
+      <div class="flex justify-between items-center" style="padding:11px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--text2);font-size:13px">Area Manager</span>
+        <span class="mono fw-600" style="color:var(--orange)" id="provAM">—</span>
+      </div>
+      <div class="flex justify-between items-center" style="padding:13px 0 0">
+        <span style="font-weight:600;font-size:13px">Totale provvigioni</span>
+        <span class="mono fw-600" style="font-size:16px;color:var(--red)" id="provTot">—</span>
+      </div>
+    </div>
+    <div class="card card-body">
+      <div class="section-title">Composizione margini</div>
+      <div style="position:relative;height:190px">
+        <canvas id="myChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Breakeven + Proiezione portafoglio -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+    <div class="card card-body" style="text-align:center">
+      <div class="section-title" style="justify-content:center">Breakeven consumo</div>
+      <div style="padding:24px 0 16px">
+        <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:var(--accent2);letter-spacing:-.5px" id="breakevenVal">—</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:8px" id="breakevenLabel">Consumo minimo per margine netto positivo</div>
+      </div>
+      <div id="breakevenNote" style="font-size:11.5px;color:var(--text3);padding:8px 12px;background:var(--bg3);border-radius:7px;display:none"></div>
+    </div>
+    <div class="card card-body">
+      <div class="section-title">Proiezione portafoglio</div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label>Numero clienti stimati</label>
+        <input type="number" id="inputClienti" min="1" step="1" placeholder="es. 100"
+               oninput="calcolaPortafoglio()">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="stat-card" style="padding:14px;border-top:2px solid rgba(148,163,184,.2)">
+          <div class="stat-label" style="font-size:9.5px">M. Lordo tot.</div>
+          <div class="stat-value color-text" style="font-size:17px" id="portLordo">—</div>
+        </div>
+        <div class="stat-card" style="padding:14px;border-top:2px solid rgba(16,185,129,.35)">
+          <div class="stat-label" style="font-size:9.5px">M. Netto tot.</div>
+          <div class="stat-value color-green" style="font-size:17px" id="portNetto">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sensitivity analysis -->
+  <div class="card card-body" style="margin-bottom:20px">
+    <div class="flex justify-between items-center" style="margin-bottom:14px">
+      <div class="section-title" style="margin-bottom:0">Sensitivity analysis — variazione consumo</div>
+      <button class="btn btn-secondary btn-sm" id="btnSensitivity" onclick="caricaSensitivity()">
+        📈 Calcola
+      </button>
+    </div>
+    <div id="sensitivityContent" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:16px;align-items:start">
+        <div class="table-wrap overflow-x">
+          <table>
+            <thead>
+              <tr>
+                <th>Consumo</th><th>% base</th><th>M. Lordo</th><th>Provvigioni</th><th>M. Netto</th><th>M. %</th>
+              </tr>
+            </thead>
+            <tbody id="sensitivityBody"></tbody>
+          </table>
+        </div>
+        <div style="position:relative;height:200px">
+          <canvas id="sensChart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div id="sensitivityEmpty" style="color:var(--text3);font-size:13px">
+      Clicca "Calcola" per vedere come varia il margine al variare del consumo (da 25% a 175% del valore base).
+    </div>
+  </div>
+
+  <!-- Salva simulazione -->
+  <div class="card" style="margin-bottom:28px;border-top:2px solid rgba(16,185,129,.35)">
+    <div class="card-body flex gap-3 items-center flex-wrap">
+      <div style="flex:1;min-width:200px">
+        <label>Note (opzionale)</label>
+        <input type="text" id="inputNote" placeholder="Aggiungi una nota a questa simulazione...">
+      </div>
+      <button class="btn btn-success" onclick="salva()" id="btnSalva" style="margin-top:18px;padding:9px 20px">
+        💾 Salva simulazione
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Storico ──────────────────────────────────────────────────────────────── -->
+<div style="margin-top:4px">
+  <div class="flex justify-between items-center flex-wrap gap-3" style="margin-bottom:16px">
+    <h2 style="font-size:16px;font-weight:600;letter-spacing:-.3px">Storico simulazioni</h2>
+    <div class="flex gap-2 flex-wrap items-center">
+      <select id="filterCommodity" onchange="aggiornaStorico()" style="width:auto;padding:6px 10px;font-size:12px">
+        <option value="">Tutte le commodity</option>
+        <option value="LUCE">🔆 Luce</option>
+        <option value="GAS">🔥 Gas</option>
+      </select>
+      <a href="/export/simulazioni" class="btn btn-secondary btn-sm">📥 Esporta Excel</a>
+      <a href="/export/offerte"     class="btn btn-secondary btn-sm">📥 Esporta offerte</a>
+    </div>
+  </div>
+  <div class="table-wrap overflow-x">
+    <table id="storicoTable">
+      <thead>
+        <tr id="storicoHead">
+          <th class="sortable" data-col="created_at" onclick="sortStorico('created_at')" style="cursor:pointer;user-select:none;white-space:nowrap">Data <span class="sort-icon" id="sort-created_at">↕</span></th>
+          <th class="sortable" data-col="nome_offerta" onclick="sortStorico('nome_offerta')" style="cursor:pointer;user-select:none">Offerta <span class="sort-icon" id="sort-nome_offerta">↕</span></th>
+          <th>Fornitore</th><th>Piano</th>
+          <th>Comm.</th>
+          <th class="sortable" data-col="margine_lordo" onclick="sortStorico('margine_lordo')" style="cursor:pointer;user-select:none">M. Lordo <span class="sort-icon" id="sort-margine_lordo">↕</span></th>
+          <th>Provvigioni</th>
+          <th class="sortable" data-col="margine_netto" onclick="sortStorico('margine_netto')" style="cursor:pointer;user-select:none">M. Netto <span class="sort-icon" id="sort-margine_netto">↕</span></th>
+          <th class="sortable" data-col="margine_percentuale" onclick="sortStorico('margine_percentuale')" style="cursor:pointer;user-select:none">M. % <span class="sort-icon" id="sort-margine_percentuale">↕</span></th>
+          {% if is_admin %}<th>Utente</th>{% endif %}
+          <th>Note</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="storicoBody">
+        <tr><td colspan="{{ 12 if is_admin else 11 }}" style="text-align:center;padding:40px;color:var(--text3)">Caricamento...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="storicoFooter" style="padding:12px 16px;font-size:12px;color:var(--text3);border-top:1px solid var(--border);display:none">
+    <div class="flex justify-between items-center">
+      <span id="storicoInfo"></span>
+      <div class="flex gap-2">
+        <button class="btn btn-secondary btn-sm" id="btnPrev" onclick="cambiaPage(-1)" disabled>← Prec.</button>
+        <button class="btn btn-secondary btn-sm" id="btnNext" onclick="cambiaPage(1)">Succ. →</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.sortable:hover{background:var(--bg4)!important;color:var(--text2)!important}
+.sort-icon{opacity:.45;font-size:10px;margin-left:2px}
+.sortable:hover .sort-icon{opacity:.9}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+// ── Stato globale ──────────────────────────────────────────────────────────────
+let chart         = null;
+let sensChart     = null;
+let lastResult    = null;
+let debTimer      = null;
+let abortCtrl     = null;
+let storicoPage   = 0;
+const STORICO_LIMIT = 20;
+let storicoSortCol = 'created_at';
+let storicoSortDir = -1; // -1 = desc, 1 = asc
+let storicoAllRows = []; // cache per sort client-side
+const IS_ADMIN      = {{ is_admin|tojson }};
+let storicoCache    = {};  // id → row, per il caricamento da storico
+let currentStoricoId = null;  // id della simulazione attualmente mostrata (da storico)
+
+// Dati fornitori originali (per filtro commodity)
+const ALL_FORNITORI = [
+  {% for f in fornitori %}
+  {id:"{{ f.id }}", commodity:"{{ f.commodity }}", label:"{{ f.nome }} ({{ f.commodity }})",
+   spread:"{{ f.spread_acquisto }}", costo:"{{ f.costo_gestione_pdp }}"},
+  {% endfor %}
+];
+
+// ── Utilità ────────────────────────────────────────────────────────────────────
+function euro(n){
+  if(n == null) return '—';
+  return '€ ' + n.toLocaleString('it-IT', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function sel(id){ const e = document.getElementById(id); return e.value ? e.options[e.selectedIndex] : null; }
+
+// ── Filtro fornitori per commodity ─────────────────────────────────────────────
+function onOffertaChange(){
+  const o         = sel('selOfferta');
+  const commodity = o ? o.dataset.commodity : null;
+  const currVal   = document.getElementById('selFornitore').value;
+
+  const selF = document.getElementById('selFornitore');
+  selF.innerHTML = '<option value="">— Media automatica (nessun fornitore) —</option>';
+  ALL_FORNITORI.forEach(f => {
+    if(!commodity || f.commodity === commodity || f.commodity === 'ENTRAMBI'){
+      const opt = document.createElement('option');
+      opt.value             = f.id;
+      opt.dataset.spread    = f.spread;
+      opt.dataset.costo     = f.costo;
+      opt.dataset.commodity = f.commodity;
+      opt.textContent       = f.label;
+      if(f.id === currVal) opt.selected = true;
+      selF.appendChild(opt);
+    }
+  });
+
+  // Resetta cache media quando cambia offerta
+  avgFornitoreCache = {};
+  updateInfoStrip();
+  simulaAuto();
+}
+
+function onFornitoreChange(){
+  updateInfoStrip();
+  simulaAuto();
+}
+
+// ── Info strip ─────────────────────────────────────────────────────────────────
+let avgFornitoreCache = {};
+
+async function updateInfoStrip(){
+  const o = sel('selOfferta');
+  const f = sel('selFornitore');
+  const strip = document.getElementById('infoStrip');
+  if(!o){ strip.style.display = 'none'; return; }
+  strip.style.display = 'block';
+
+  const c = o.dataset.commodity;
+  document.getElementById('unitLabel').textContent    = c === 'LUCE' ? 'MWh' : 'smc';
+  document.getElementById('inputConsumo').placeholder = 'Default: ' + o.dataset.consumo + ' ' + (c === 'LUCE' ? 'MWh' : 'smc');
+  document.getElementById('chipTipo').innerHTML       = '<span>Tipo:</span>' + o.dataset.tipo;
+  document.getElementById('chipSpreadV').innerHTML    = '<span>Spread vendita:</span>' + o.dataset.spread;
+  document.getElementById('chipQF').innerHTML         = '<span>QF vendita:</span>€ ' + o.dataset.qf + '/mese';
+
+  const usaMedia = !document.getElementById('selFornitore').value;
+  document.getElementById('bannerFornitoreMedia').style.display = usaMedia ? 'flex' : 'none';
+  document.getElementById('fornitoreLabel').textContent = usaMedia ? '— media automatica' : '';
+
+  if(f){
+    document.getElementById('chipSpreadA').innerHTML = '<span>Spread acquisto:</span>' + f.dataset.spread;
+    document.getElementById('chipCosto').innerHTML   = '<span>Costo PdP:</span>€ ' + f.dataset.costo + '/mese';
+  } else {
+    // Carica media dal server (con cache per commodity)
+    if(!avgFornitoreCache[c]){
+      try {
+        const res = await fetch('/api/fornitore-medio/' + c);
+        if(res.ok) avgFornitoreCache[c] = await res.json();
+      } catch(e){ /* ignora */ }
+    }
+    const avg = avgFornitoreCache[c];
+    if(avg){
+      document.getElementById('chipSpreadA').innerHTML = '<span>Spread acquisto (media):</span>' + avg.spread_acquisto;
+      document.getElementById('chipCosto').innerHTML   = '<span>Costo PdP (media):</span>€ ' + avg.costo_gestione_pdp + '/mese';
+    } else {
+      document.getElementById('chipSpreadA').innerHTML = '<span>Spread acquisto:</span>—';
+      document.getElementById('chipCosto').innerHTML   = '<span>Costo PdP:</span>—';
+    }
+  }
+}
+
+// ── Auto-simula (su cambio select) ─────────────────────────────────────────────
+function simulaAuto(){
+  const oId = document.getElementById('selOfferta').value;
+  const pId = document.getElementById('selPiano').value;
+  if(oId && pId) simula();
+  else {
+    document.getElementById('results').style.display    = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+  }
+}
+
+function simulaDebounced(){
+  clearTimeout(debTimer);
+  debTimer = setTimeout(simula, 400);
+}
+
+// ── Simulazione principale ────────────────────────────────────────────────────
+async function simula(){
+  document.getElementById('sensitivityContent').style.display = 'none';
+  document.getElementById('sensitivityEmpty').style.display   = 'block';
+
+  const oId = document.getElementById('selOfferta').value;
+  const fId = document.getElementById('selFornitore').value; // '' = media automatica
+  const pId = document.getElementById('selPiano').value;
+
+  if(!oId || !pId){
+    document.getElementById('results').style.display    = 'none';
+    document.getElementById('emptyState').style.display = 'block';
+    return;
+  }
+
+  await updateInfoStrip();
+
+  if(abortCtrl) abortCtrl.abort();
+  abortCtrl = new AbortController();
+
+  const btnCalcola = document.getElementById('btnCalcola');
+  btnCalcola.disabled = true;
+  btnCalcola.textContent = '⏳ Calcolo...';
+
+  try {
+    const consumoVal = document.getElementById('inputConsumo').value;
+    const body = {offerta_id: oId, piano_id: pId};
+    if(fId) body.fornitore_id = fId;
+    if(consumoVal) body.consumo_override = consumoVal;
+
+    const res = await fetch('/api/simula', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+      signal: abortCtrl.signal
+    });
+    if(!res.ok){
+      const err = await res.json().catch(() => ({}));
+      showToast(err.error || 'Errore nel calcolo.', 'error');
+      return;
+    }
+    const r = await res.json();
+    lastResult = r;
+    currentStoricoId = null;  // simulazione fresca, non da storico
+    mostraRisultati(r);
+  } catch(e){
+    if(e.name !== 'AbortError') console.error('Errore simulazione:', e);
+  } finally {
+    btnCalcola.disabled = false;
+    btnCalcola.textContent = '⚡ Calcola';
+  }
+}
+
+function mostraRisultati(r){
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('results').style.display    = 'block';
+
+  // Banner + pulsante download — visibili solo quando si carica dallo storico
+  const banner = document.getElementById('storicoLoadedBanner');
+  const dlBtn  = document.getElementById('btnDownloadSim');
+  const pdfBtn = document.getElementById('btnDownloadPdf');
+  if(currentStoricoId){
+    if(banner)  banner.style.display = 'block';
+    if(dlBtn)   dlBtn.href = `/export/simulazione/${currentStoricoId}`;
+    if(pdfBtn)  pdfBtn.href = `/export/simulazione/${currentStoricoId}/pdf`;
+  } else {
+    if(banner) banner.style.display = 'none';
+  }
+
+  document.getElementById('kpiSpread').textContent = euro(r.margine_spread_annuo);
+  document.getElementById('kpiQF').textContent     = euro(r.margine_qf_annuo);
+  const scontoCard = document.getElementById('kpiScontoCard');
+  if(r.sconto_annuo && r.sconto_annuo > 0){
+    document.getElementById('kpiSconto').textContent = '− ' + euro(r.sconto_annuo);
+    scontoCard.style.display = '';
+  } else {
+    scontoCard.style.display = 'none';
+  }
+  document.getElementById('kpiLordo').textContent  = euro(r.margine_lordo);
+
+  const nettoEl = document.getElementById('kpiNetto');
+  nettoEl.textContent = euro(r.margine_netto);
+  nettoEl.className   = 'stat-value ' + (r.margine_netto >= 0 ? 'color-green' : 'color-red');
+  document.getElementById('kpiPct').textContent = fmtIT(r.margine_percentuale, 1) + '% del lordo';
+
+  // Provvigioni — senza segno negativo
+  document.getElementById('provAgente').textContent = euro(r.provvigione_agente);
+  document.getElementById('provSub').textContent    = euro(r.provvigione_sub_agente);
+  document.getElementById('provAM').textContent     = euro(r.provvigione_area_manager);
+  document.getElementById('provTot').textContent    = euro(r.totale_provvigioni);
+
+  // Warnings
+  const ws = r.warnings || [];
+  document.getElementById('warnSpread').style.display = ws.includes('spread_negativo') ? 'flex' : 'none';
+  document.getElementById('warnLordo').style.display  = ws.includes('lordo_negativo')  ? 'flex' : 'none';
+
+  // Breakeven
+  const bv   = document.getElementById('breakevenVal');
+  const bl   = document.getElementById('breakevenLabel');
+  const bn   = document.getElementById('breakevenNote');
+  const unit = (r.commodity || sel('selOfferta')?.dataset?.commodity) === 'LUCE' ? 'MWh' : 'smc';
+  if(r.breakeven !== null && r.breakeven !== undefined){
+    const consumoAttuale = parseFloat(document.getElementById('inputConsumo').value) || r.consumo_medio;
+    bv.textContent = r.breakeven.toLocaleString('it-IT', {maximumFractionDigits:2}) + ' ' + unit;
+    bv.className   = consumoAttuale >= r.breakeven ? 'color-green' : 'color-red';
+    bl.textContent = consumoAttuale >= r.breakeven
+      ? '✅ Consumo attuale sopra il breakeven'
+      : '⚠️ Consumo attuale sotto il breakeven';
+    bn.textContent = `Consumo attuale: ${consumoAttuale.toLocaleString('it-IT',{maximumFractionDigits:2})} ${unit}`;
+  } else {
+    bv.textContent = r.margine_netto >= 0 ? 'Sempre positivo' : 'Non raggiungibile';
+    bv.className   = r.margine_netto >= 0 ? 'color-green' : 'color-red';
+    bl.textContent = ''; bn.textContent = '';
+  }
+
+  calcolaPortafoglio();
+  renderChart(r);
+}
+
+// ── Proiezione portafoglio ─────────────────────────────────────────────────────
+function calcolaPortafoglio(){
+  if(!lastResult) return;
+  const n = parseInt(document.getElementById('inputClienti').value);
+  if(!n || n <= 0){
+    document.getElementById('portLordo').textContent = '—';
+    document.getElementById('portNetto').textContent = '—';
+    return;
+  }
+  document.getElementById('portLordo').textContent = euro(lastResult.margine_lordo * n);
+  const nettoEl = document.getElementById('portNetto');
+  nettoEl.textContent = euro(lastResult.margine_netto * n);
+  nettoEl.className   = 'stat-value ' + (lastResult.margine_netto >= 0 ? 'color-green' : 'color-red');
+  nettoEl.style.fontSize = '16px';
+}
+
+// ── Grafico composizione margini ───────────────────────────────────────────────
+function renderChart(r){
+  const labels = ['M. Spread','M. QF',
+    ...(r.sconto_annuo > 0 ? ['Sconto'] : []),
+    'Provv. Agente','Provv. Sub-Ag.','Provv. AM','M. Netto'];
+  const data   = [
+    r.margine_spread_annuo, r.margine_qf_annuo,
+    ...(r.sconto_annuo > 0 ? [-r.sconto_annuo] : []),
+    -r.provvigione_agente, -r.provvigione_sub_agente, -r.provvigione_area_manager,
+    r.margine_netto
+  ];
+  const colors = ['#4f6ef7','#7c9dff',
+    ...(r.sconto_annuo > 0 ? ['#ef4444'] : []),
+    '#f85149','#d29922','#bc8cff',
+    r.margine_netto >= 0 ? '#3fb950' : '#f85149'];
+  if(chart){ chart.destroy(); chart = null; }
+  chart = new Chart(document.getElementById('myChart'), {
+    type: 'bar',
+    data: {labels, datasets:[{data, backgroundColor:colors, borderRadius:4, borderSkipped:false}]},
+    options: {
+      animation:false, responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label: ctx => euro(Math.abs(ctx.raw))}}
+      },
+      scales:{
+        x:{ticks:{color:'#6e7681',font:{size:11}},grid:{display:false},border:{display:false}},
+        y:{ticks:{color:'#6e7681',font:{size:11},
+             callback:v=>'€'+(Math.abs(v)>=1000?fmtIT(v/1000,1)+'k':fmtIT(v,0))},
+           grid:{color:'#21262d'},border:{display:false}}
+      }
+    }
+  });
+}
+
+// ── Sensitivity analysis ───────────────────────────────────────────────────────
+async function caricaSensitivity(){
+  const oId = document.getElementById('selOfferta').value;
+  const fId = document.getElementById('selFornitore').value;
+  const pId = document.getElementById('selPiano').value;
+  if(!oId || !pId){ showToast('Seleziona prima offerta e piano.', 'warning'); return; }
+
+  const btn = document.getElementById('btnSensitivity');
+  btn.disabled = true; btn.textContent = '⏳ Caricamento...';
+  try {
+    const body = {offerta_id:oId, piano_id:pId};
+    if(fId) body.fornitore_id = fId;
+    const res = await fetch('/api/sensitivity', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    if(!res.ok) return;
+    renderSensitivity(await res.json());
+  } catch(e){ console.error(e); }
+  finally { btn.disabled = false; btn.textContent = '📈 Ricalcola'; }
+}
+
+function renderSensitivity(righe){
+  document.getElementById('sensitivityEmpty').style.display   = 'none';
+  document.getElementById('sensitivityContent').style.display = 'block';
+  const unit = sel('selOfferta')?.dataset?.commodity === 'LUCE' ? 'MWh' : 'smc';
+  document.getElementById('sensitivityBody').innerHTML = righe.map(r => {
+    const nc    = r.margine_netto >= 0 ? 'color-green' : 'color-red';
+    const bg    = r.pct_base === 100 ? 'background:rgba(79,110,247,.08);' : '';
+    const badge = r.pct_base === 100 ? '<span class="badge badge-blue" style="margin-left:4px;font-size:10px">base</span>' : '';
+    return `<tr style="${bg}">
+      <td class="mono">${r.consumo.toLocaleString('it-IT',{maximumFractionDigits:2})} ${unit}</td>
+      <td class="mono">${r.pct_base}%${badge}</td>
+      <td class="mono">${euro(r.margine_lordo)}</td>
+      <td class="mono color-red">${euro(r.totale_provvigioni)}</td>
+      <td class="mono fw-600 ${nc}">${euro(r.margine_netto)}</td>
+      <td class="mono text-muted">${fmtIT(r.margine_percentuale,1)}%</td>
+    </tr>`;
+  }).join('');
+
+  if(sensChart){ sensChart.destroy(); sensChart = null; }
+  sensChart = new Chart(document.getElementById('sensChart'), {
+    type:'line',
+    data:{
+      labels:righe.map(r=>r.pct_base+'%'),
+      datasets:[
+        {label:'M. Lordo',  data:righe.map(r=>r.margine_lordo),    borderColor:'#4f6ef7',backgroundColor:'rgba(79,110,247,.1)',tension:.3,fill:false,pointRadius:4},
+        {label:'M. Netto',  data:righe.map(r=>r.margine_netto),    borderColor:'#3fb950',backgroundColor:'rgba(63,185,80,.1)', tension:.3,fill:true, pointRadius:4},
+        {label:'Provvigioni',data:righe.map(r=>r.totale_provvigioni),borderColor:'#f85149',tension:.3,fill:false,borderDash:[4,3],pointRadius:3}
+      ]
+    },
+    options:{
+      animation:false,responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#8b949e',font:{size:11}}},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+euro(ctx.raw)}}},
+      scales:{
+        x:{ticks:{color:'#6e7681',font:{size:11}},grid:{color:'#21262d'},border:{display:false}},
+        y:{ticks:{color:'#6e7681',font:{size:11},callback:v=>'€'+(Math.abs(v)>=1000?fmtIT(v/1000,1)+'k':fmtIT(v,0))},grid:{color:'#21262d'},border:{display:false}}
+      }
+    }
+  });
+}
+
+// ── Salvataggio ────────────────────────────────────────────────────────────────
+async function salva(){
+  if(!lastResult) return;
+  const btn = document.getElementById('btnSalva');
+  btn.disabled = true; btn.textContent = 'Salvataggio...';
+  try {
+    const oId    = document.getElementById('selOfferta').value;
+    const fId    = document.getElementById('selFornitore').value;
+    const pId    = document.getElementById('selPiano').value;
+    const consumo = document.getElementById('inputConsumo').value;
+    const note   = document.getElementById('inputNote').value;
+    const body   = {offerta_id:oId, piano_id:pId, note};
+    if(fId) body.fornitore_id = fId;
+    if(consumo) body.consumo_override = consumo;
+    const res = await fetch('/api/salva-simulazione', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    if(res.ok){
+      document.getElementById('inputNote').value = '';
+      showToast('Simulazione salvata nello storico.', 'success');
+      storicoPage = 0;
+      await aggiornaStorico();
+    } else {
+      showToast('Errore nel salvataggio.', 'error');
+    }
+  } catch(e){ showToast('Errore di rete.', 'error'); }
+  finally { btn.disabled = false; btn.textContent = '💾 Salva simulazione'; }
+}
+
+// ── Render righe storico ───────────────────────────────────────────────────────
+function renderStoricoRows(rows){
+  const tbody = document.getElementById('storicoBody');
+  if(!tbody) return;
+  tbody.innerHTML = rows.map(s => {
+    const data     = (s.created_at||'').substring(0,16).replace('T',' ');
+    const lordo    = euro(s.margine_lordo);
+    const totProv  = euro(s.totale_provvigioni);
+    const nettoCol = s.margine_netto != null && s.margine_netto >= 0 ? 'color-green' : 'color-red';
+    const netto    = euro(s.margine_netto);
+    const pct      = s.margine_percentuale != null ? fmtIT(s.margine_percentuale,1)+'%' : '—';
+    const commBadge = s.commodity === 'LUCE' ? 'badge-orange' : 'badge-blue';
+    const utenteCell = IS_ADMIN
+      ? `<td style="font-size:11px;color:var(--text3);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.user_email||''}">${s.user_email||'—'}</td>`
+      : '';
+    return `<tr class="storico-row" onclick="caricaDaStorico(${s.id})" title="Clicca per riaprire i grafici di questa simulazione" style="cursor:pointer">
+      <td style="font-size:12px;color:var(--text3);white-space:nowrap">${data}</td>
+      <td><strong>${s.nome_offerta||'—'}</strong></td>
+      <td class="text-muted">${s.nome_fornitore||'—'}</td>
+      <td class="text-muted">${s.nome_piano||'—'}</td>
+      <td><span class="badge ${commBadge}">${s.commodity||'—'}</span></td>
+      <td class="mono">${lordo}</td>
+      <td class="mono color-red">${totProv}</td>
+      <td class="mono fw-600 ${nettoCol}">${netto}</td>
+      <td class="mono text-muted">${pct}</td>
+      ${utenteCell}
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text3)">${s.note||'—'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();duplicaStorico(${s.id})" title="Duplica nel form" style="margin-right:2px">⧉</button>
+        <a href="/export/simulazione/${s.id}" class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" title="Scarica Excel" style="margin-right:2px">📥</a>
+        <a href="/export/simulazione/${s.id}/pdf" class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" title="Scarica PDF" style="margin-right:4px">🖨</a>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();eliminaStorico(${s.id},this)" title="Elimina">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Storico con filtri e paginazione ──────────────────────────────────────────
+async function aggiornaStorico(){
+  const commodity = document.getElementById('filterCommodity').value;
+  const offset    = storicoPage * STORICO_LIMIT;
+  try {
+    const params = new URLSearchParams({limit:STORICO_LIMIT, offset});
+    if(commodity) params.set('commodity', commodity);
+    const res = await fetch('/api/storico?' + params.toString());
+    if(!res.ok) return;
+    let {rows:righe, total} = await res.json();
+    const tbody = document.getElementById('storicoBody');
+
+    const COLS = IS_ADMIN ? 12 : 11;
+    if(righe.length === 0 && storicoPage === 0){
+      tbody.innerHTML = `<tr><td colspan="${COLS}" style="text-align:center;padding:40px;color:var(--text3)">Nessuna simulazione salvata</td></tr>`;
+      document.getElementById('storicoFooter').style.display = 'none';
+      return;
+    }
+    // Popola cache per ricaricamento e sort
+    storicoCache = {};
+    righe.forEach(s => { storicoCache[s.id] = s; });
+    storicoAllRows = righe;
+    // Applica sort corrente
+    if(storicoSortCol !== 'created_at' || storicoSortDir !== -1){
+      righe = [...righe].sort((a,b)=>{
+        let av = a[storicoSortCol] ?? '', bv = b[storicoSortCol] ?? '';
+        if(!isNaN(Number(av))){ av = Number(av); bv = Number(bv); }
+        return av < bv ? -storicoSortDir : av > bv ? storicoSortDir : 0;
+      });
+    }
+
+    renderStoricoRows(righe);
+
+    const from = offset + 1;
+    const to   = Math.min(offset + righe.length, total);
+    document.getElementById('storicoInfo').textContent = `${from}–${to} di ${total} simulazioni`;
+    document.getElementById('btnPrev').disabled = storicoPage === 0;
+    document.getElementById('btnNext').disabled = offset + righe.length >= total;
+    document.getElementById('storicoFooter').style.display = 'flex';
+  } catch(e){ console.error('Errore storico:', e); }
+}
+
+function cambiaPage(dir){
+  storicoPage = Math.max(0, storicoPage + dir);
+  aggiornaStorico();
+}
+
+// ── Sort storico (client-side) ─────────────────────────────────────────────────
+function sortStorico(col){
+  if(storicoSortCol === col) storicoSortDir *= -1;
+  else { storicoSortCol = col; storicoSortDir = col === 'created_at' ? -1 : -1; }
+  // Aggiorna icone
+  document.querySelectorAll('.sort-icon').forEach(el => el.textContent = '↕');
+  const icon = document.getElementById('sort-' + col);
+  if(icon) icon.textContent = storicoSortDir === 1 ? '↑' : '↓';
+  // Ordina e re-renderizza senza fetch
+  if(storicoAllRows.length === 0) return;
+  const sorted = [...storicoAllRows].sort((a,b)=>{
+    let av = a[col] ?? '', bv = b[col] ?? '';
+    if(typeof av === 'number' || !isNaN(Number(av))){ av = Number(av); bv = Number(bv); }
+    return av < bv ? -storicoSortDir : av > bv ? storicoSortDir : 0;
+  });
+  renderStoricoRows(sorted);
+}
+
+// ── Duplica simulazione nel form ───────────────────────────────────────────────
+function duplicaStorico(id){
+  const s = storicoCache[id];
+  if(!s){ showToast('Simulazione non trovata in cache.','error'); return; }
+  // Pre-compila i campi del form con i valori della simulazione
+  const selOff = document.getElementById('selOfferta');
+  const selFor = document.getElementById('selFornitore');
+  const selPia = document.getElementById('selPiano');
+  const inpCon = document.getElementById('inputConsumo');
+  if(selOff && s.offerta_id) selOff.value = s.offerta_id;
+  if(selFor && s.fornitore_id) selFor.value = s.fornitore_id;
+  if(selPia && s.piano_id) selPia.value = s.piano_id;
+  if(inpCon) inpCon.value = s.consumo_medio || '';
+  // Avvia calcolo automaticamente
+  document.getElementById('results').style.display = 'none';
+  // Scorri al form (usa il primo elemento visibile della sezione)
+  const formEl = document.getElementById('selOfferta') || document.querySelector('.card.card-body');
+  if(formEl) formEl.closest('.card, .card-body')?.scrollIntoView({behavior:'smooth', block:'start'});
+  showToast('Form precompilato. Premi Calcola per rielaborare con i nuovi dati.','info');
+  // Trigger calcolo con debounce
+  setTimeout(()=>{ if(document.getElementById('selOfferta').value) simulaDebounced(); }, 500);
+}
+
+// ── Ricarica simulazione dallo storico ─────────────────────────────────────────
+function caricaDaStorico(id){
+  const s = storicoCache[id];
+  if(!s) return;
+
+  lastResult = s;
+  currentStoricoId = id;
+
+  // Pre-compila il campo consumo con il valore salvato
+  const inputConsumo = document.getElementById('inputConsumo');
+  if(inputConsumo) inputConsumo.value = s.consumo_medio || '';
+
+  // Nasconde la sensitivity (richiede una nuova chiamata API con gli ID corretti)
+  document.getElementById('sensitivityContent').style.display = 'none';
+  document.getElementById('sensitivityEmpty').style.display   = 'block';
+
+  // Evidenzia la riga attiva nello storico
+  document.querySelectorAll('.storico-row').forEach(r => r.classList.remove('storico-row-active'));
+  const activeRow = document.querySelector(`.storico-row[onclick="caricaDaStorico(${id})"]`);
+  if(activeRow) activeRow.classList.add('storico-row-active');
+
+  // Mostra i risultati e scrolla in cima
+  mostraRisultati(s);
+  document.getElementById('results').scrollIntoView({behavior:'smooth', block:'nearest'});
+
+  const data = (s.created_at||'').substring(0,10);
+  showToast(`Simulazione del ${data} caricata.`, 'info');
+}
+
+async function eliminaStorico(id, btn){
+  if(!confirm('Eliminare questa simulazione?')) return;
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/storico/elimina/' + id, {method:'DELETE'});
+    if(res.ok){
+      showToast('Simulazione eliminata.', 'info');
+      await aggiornaStorico();
+    } else {
+      showToast('Errore nell\'eliminazione.', 'error');
+      btn.disabled = false;
+    }
+  } catch(e){ btn.disabled = false; }
+}
+
+// ── Inizializzazione ───────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', aggiornaStorico);
+</script>
+{% endblock %}

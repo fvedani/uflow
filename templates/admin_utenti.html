@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Gestione Utenti — UFLOW{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Gestione Utenti</h1>
+    <p class="page-subtitle">Panoramica di tutti gli account registrati</p>
+  </div>
+  <span class="badge badge-admin" style="align-self:center">👑 Admin</span>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ 'success' if cat == 'success' else ('warning' if cat == 'warning' else 'info') }}" style="margin-bottom:16px">
+    {{ msg }}
+  </div>
+  {% endfor %}
+{% endwith %}
+
+<!-- ── KPI utenti ──────────────────────────────────────────────────────────── -->
+<div class="stat-grid stat-grid-4" style="margin-bottom:20px">
+  <div class="stat-card">
+    <div class="stat-label">Utenti totali</div>
+    <div class="stat-value color-accent">{{ utenti|length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Amministratori</div>
+    <div class="stat-value color-orange">{{ utenti|selectattr('is_admin','equalto',1)|list|length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Simulazioni totali</div>
+    <div class="stat-value color-text">{{ utenti|sum(attribute='n_simulazioni') }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Offerte totali</div>
+    <div class="stat-value color-text">{{ utenti|sum(attribute='n_offerte') }}</div>
+  </div>
+</div>
+
+<!-- ── Tabella utenti ─────────────────────────────────────────────────────── -->
+<div class="card card-body">
+  <div class="flex justify-between items-center" style="margin-bottom:14px">
+    <div class="section-title" style="margin:0">Elenco account</div>
+    <input type="text" id="searchUtenti" placeholder="🔍 Cerca per email…"
+           oninput="filterUtenti()"
+           style="width:220px;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text1)">
+  </div>
+
+  <div class="table-wrap overflow-x">
+    <table id="tblUtenti">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Ruolo</th>
+          <th style="text-align:center">Offerte</th>
+          <th style="text-align:center">Fornitori</th>
+          <th style="text-align:center">Piani prov.</th>
+          <th style="text-align:center">Simulazioni</th>
+          <th>Ultima sim.</th>
+          <th>Registrato il</th>
+          <th style="text-align:center">Azioni</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in utenti %}
+        <tr data-search="{{ u.email|lower }}">
+          <td>
+            <div style="font-weight:600;font-size:13px">{{ u.email }}</div>
+          </td>
+          <td>
+            {% if u.is_admin %}
+            <span class="badge badge-admin">👑 Admin</span>
+            {% else %}
+            <span class="badge" style="background:var(--bg4);color:var(--text2);border:1px solid var(--border)">Utente</span>
+            {% endif %}
+          </td>
+          <td class="mono" style="text-align:center">{{ u.n_offerte }}</td>
+          <td class="mono" style="text-align:center">{{ u.n_fornitori }}</td>
+          <td class="mono" style="text-align:center">{{ u.n_piani }}</td>
+          <td class="mono fw-600 {{ 'color-accent' if u.n_simulazioni > 0 else 'text-muted' }}" style="text-align:center">
+            {{ u.n_simulazioni }}
+          </td>
+          <td style="font-size:12px;color:var(--text3);white-space:nowrap">
+            {{ (u.ultima_simulazione or '')[:16].replace('T',' ') or '—' }}
+          </td>
+          <td style="font-size:12px;color:var(--text3);white-space:nowrap">
+            {{ (u.created_at or '')[:10] or '—' }}
+          </td>
+          <td style="text-align:center">
+            {% if u.id != current_user.id %}
+            <form method="POST" action="/admin/utenti/toggle-admin/{{ u.id }}"
+                  onsubmit='return confirm({{ ("Rimuovere i privilegi admin da " ~ u.email ~ "?" if u.is_admin else "Assegnare i privilegi admin a " ~ u.email ~ "?")|tojson }})'
+                  style="display:inline">
+              <button type="submit"
+                      class="btn btn-sm {{ 'btn-danger' if u.is_admin else 'btn-secondary' }}"
+                      title="{{ 'Rimuovi admin' if u.is_admin else 'Promuovi ad admin' }}">
+                {{ '👑 Rimuovi admin' if u.is_admin else '⬆ Promuovi admin' }}
+              </button>
+            </form>
+            {% else %}
+            <span style="font-size:11px;color:var(--text3);font-style:italic">Tu</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if utenti|length == 0 %}
+  <div class="empty">
+    <div class="empty-icon">👤</div>
+    <div class="empty-title">Nessun utente trovato</div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterUtenti(){
+  const q = document.getElementById('searchUtenti').value.toLowerCase();
+  document.querySelectorAll('#tblUtenti tbody tr').forEach(row => {
+    row.style.display = row.dataset.search.includes(q) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

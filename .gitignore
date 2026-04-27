@@ -1,0 +1,29 @@
+# Database SQLite (non più usato ma per sicurezza)
+*.db
+*.db-shm
+*.db-wal
+
+# Variabili d'ambiente
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+venv/
+.venv/
+env/
+
+# Vercel
+.vercel/
+
+# OS
+.DS_Store
+desktop.ini
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

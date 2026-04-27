@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% block title %}Confronto Scenari — UFLOW{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Confronto scenari</h1>
+    <p class="page-subtitle">Affianca due simulazioni e analizza le differenze</p>
+  </div>
+</div>
+
+<!-- Selettori scenari -->
+<div class="card card-body" style="margin-bottom:20px">
+  <form method="GET" action="/confronto">
+    <div class="form-grid form-grid-2" style="align-items:end">
+      <div class="form-group" style="margin:0">
+        <label>Scenario A</label>
+        <select name="a" required>
+          <option value="">— Seleziona simulazione —</option>
+          {% for s in sims %}
+          <option value="{{ s.id }}" {{ 'selected' if s.id == sid_a }}>
+            [{{ (s.created_at or '')[:10] }}] {{ s.nome_offerta }} — {{ s.nome_piano }}
+            (€{{ (s.margine_netto or 0)|n2 }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Scenario B</label>
+        <select name="b" required>
+          <option value="">— Seleziona simulazione —</option>
+          {% for s in sims %}
+          <option value="{{ s.id }}" {{ 'selected' if s.id == sid_b }}>
+            [{{ (s.created_at or '')[:10] }}] {{ s.nome_offerta }} — {{ s.nome_piano }}
+            (€{{ (s.margine_netto or 0)|n2 }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:14px;text-align:right">
+      <button type="submit" class="btn btn-primary">⚖ Confronta</button>
+    </div>
+  </form>
+</div>
+
+{% if sim_a and sim_b %}
+
+{# ── Calcola differenze ── #}
+{% set diff_lordo   = (sim_b.margine_lordo or 0)         - (sim_a.margine_lordo or 0) %}
+{% set diff_provv   = (sim_b.totale_provvigioni or 0)     - (sim_a.totale_provvigioni or 0) %}
+{% set diff_netto   = (sim_b.margine_netto or 0)          - (sim_a.margine_netto or 0) %}
+{% set diff_pct     = (sim_b.margine_percentuale or 0)    - (sim_a.margine_percentuale or 0) %}
+{% set diff_spread  = (sim_b.margine_spread_annuo or 0)   - (sim_a.margine_spread_annuo or 0) %}
+{% set diff_qf      = (sim_b.margine_qf_annuo or 0)       - (sim_a.margine_qf_annuo or 0) %}
+{% set diff_consumo = (sim_b.consumo_medio or 0)          - (sim_a.consumo_medio or 0) %}
+
+<!-- Banner risultato confronto -->
+<div class="card card-body" style="margin-bottom:20px;background:{% if diff_netto > 0 %}rgba(63,185,80,.08){% elif diff_netto < 0 %}rgba(248,81,73,.08){% else %}var(--bg3){% endif %};border-color:{% if diff_netto > 0 %}rgba(63,185,80,.3){% elif diff_netto < 0 %}rgba(248,81,73,.3){% else %}var(--border){% endif %}">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:4px">Differenza margine netto (B − A)</div>
+      <div style="font-size:28px;font-weight:700;font-family:var(--mono);color:{% if diff_netto > 0 %}var(--green){% elif diff_netto < 0 %}var(--red){% else %}var(--text2){% endif %}">
+        {{ '+' if diff_netto > 0 else '' }}€{{ diff_netto|n2 }}
+      </div>
+    </div>
+    <div style="font-size:13px;color:var(--text2)">
+      {% if diff_netto > 0 %}
+        ✅ Lo scenario B genera <strong style="color:var(--green)">€{{ diff_netto|n2 }} in più</strong> di margine netto
+      {% elif diff_netto < 0 %}
+        ⚠️ Lo scenario B genera <strong style="color:var(--red)">€{{ (diff_netto|abs)|n2 }} in meno</strong> di margine netto
+      {% else %}
+        ⚖ I due scenari producono lo stesso margine netto
+      {% endif %}
+    </div>
+    <div class="flex gap-2">
+      <a href="/export/confronto?a={{ sid_a }}&b={{ sid_b }}" class="btn btn-secondary btn-sm">📥 Esporta Excel</a>
+    </div>
+  </div>
+</div>
+
+<!-- KPI differenze -->
+<div class="stat-grid stat-grid-4" style="margin-bottom:20px">
+  {% macro diff_card(label, val_a, val_b, diff, fmt='€') %}
+  <div class="stat-card">
+    <div class="stat-label">{{ label }}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0">
+      <div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:2px">A</div>
+        <div class="mono" style="font-size:13px;color:var(--text2)">{{ fmt }}{{ (val_a or 0)|n2 }}</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:2px">B</div>
+        <div class="mono" style="font-size:13px;color:var(--text2)">{{ fmt }}{{ (val_b or 0)|n2 }}</div>
+      </div>
+    </div>
+    <div class="mono fw-600" style="font-size:15px;color:{% if diff > 0 %}var(--green){% elif diff < 0 %}var(--red){% else %}var(--text3){% endif %}">
+      {{ '+' if diff > 0 else '' }}{{ fmt }}{{ diff|n2 }}
+    </div>
+  </div>
+  {% endmacro %}
+  {{ diff_card('Margine Lordo',    sim_a.margine_lordo,      sim_b.margine_lordo,      diff_lordo) }}
+  {{ diff_card('Provvigioni tot.', sim_a.totale_provvigioni, sim_b.totale_provvigioni, diff_provv) }}
+  {{ diff_card('Margine Netto',    sim_a.margine_netto,      sim_b.margine_netto,      diff_netto) }}
+  <div class="stat-card">
+    <div class="stat-label">Margine %</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0">
+      <div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:2px">A</div>
+        <div class="mono" style="font-size:13px;color:var(--text2)">{{ '%.1f'|format(sim_a.margine_percentuale or 0) }}%</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--text3);margin-bottom:2px">B</div>
+        <div class="mono" style="font-size:13px;color:var(--text2)">{{ '%.1f'|format(sim_b.margine_percentuale or 0) }}%</div>
+      </div>
+    </div>
+    <div class="mono fw-600" style="font-size:15px;color:{% if diff_pct > 0 %}var(--green){% elif diff_pct < 0 %}var(--red){% else %}var(--text3){% endif %}">
+      {{ '+' if diff_pct > 0 else '' }}{{ '%.1f'|format(diff_pct) }}%
+    </div>
+  </div>
+</div>
+
+<!-- Tabella comparativa completa -->
+<div class="card card-body" style="margin-bottom:20px">
+  <div class="section-title" style="margin-bottom:16px">Dettaglio comparativo</div>
+  <div class="table-wrap overflow-x">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:35%">Voce</th>
+          <th style="text-align:right;color:#7c9dff">Scenario A</th>
+          <th style="text-align:right;color:#bc8cff">Scenario B</th>
+          <th style="text-align:right">Differenza (B−A)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% macro cmp_row(label, va, vb, fmt='euro', bold=false, is_section=false) %}
+        {% if is_section %}
+        <tr><td colspan="4" style="padding:6px 14px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;background:var(--bg);border-bottom:1px solid var(--border)">{{ label }}</td></tr>
+        {% else %}
+        {% set d = (vb or 0) - (va or 0) %}
+        {% set dc = 'color-green' if d > 0 else ('color-red' if d < 0 else 'text-muted') %}
+        <tr>
+          <td style="{{ 'font-weight:600' if bold }}">{{ label }}</td>
+          <td class="mono" style="text-align:right;color:var(--text2)">
+            {% if fmt == 'euro' %}€{{ (va or 0)|n2 }}
+            {% elif fmt == 'pct' %}{{ (va or 0)|n1 }}%
+            {% elif fmt == 'raw4' %}{{ (va or 0)|n4 }}
+            {% else %}{{ va or '—' }}{% endif %}
+          </td>
+          <td class="mono" style="text-align:right;color:var(--text2)">
+            {% if fmt == 'euro' %}€{{ (vb or 0)|n2 }}
+            {% elif fmt == 'pct' %}{{ (vb or 0)|n1 }}%
+            {% elif fmt == 'raw4' %}{{ (vb or 0)|n4 }}
+            {% else %}{{ vb or '—' }}{% endif %}
+          </td>
+          <td class="mono fw-600 {{ dc }}" style="text-align:right">
+            {% if fmt == 'euro' %}{{ '+' if d > 0 else '' }}€{{ '%.2f'|format(d) }}
+            {% elif fmt == 'pct' %}{{ '+' if d > 0 else '' }}{{ d|n1 }}%
+            {% elif fmt == 'raw4' %}{{ '+' if d > 0 else '' }}{{ d|n4 }}
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endif %}
+        {% endmacro %}
+
+        {{ cmp_row('ANAGRAFICA', is_section=true) }}
+        <tr>
+          <td style="color:var(--text3);font-size:12px">Offerta</td>
+          <td style="text-align:right;font-size:12px">{{ sim_a.nome_offerta or '—' }}</td>
+          <td style="text-align:right;font-size:12px">{{ sim_b.nome_offerta or '—' }}</td>
+          <td style="text-align:right">
+            {% if sim_a.nome_offerta != sim_b.nome_offerta %}<span class="badge badge-orange" style="font-size:10px">diversa</span>{% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td style="color:var(--text3);font-size:12px">Fornitore</td>
+          <td style="text-align:right;font-size:12px">{{ sim_a.nome_fornitore or '—' }}</td>
+          <td style="text-align:right;font-size:12px">{{ sim_b.nome_fornitore or '—' }}</td>
+          <td style="text-align:right">
+            {% if sim_a.nome_fornitore != sim_b.nome_fornitore %}<span class="badge badge-orange" style="font-size:10px">diverso</span>{% endif %}
+          </td>
+        </tr>
+        <tr>
+          <td style="color:var(--text3);font-size:12px">Piano provvigionale</td>
+          <td style="text-align:right;font-size:12px">{{ sim_a.nome_piano or '—' }}</td>
+          <td style="text-align:right;font-size:12px">{{ sim_b.nome_piano or '—' }}</td>
+          <td style="text-align:right">
+            {% if sim_a.nome_piano != sim_b.nome_piano %}<span class="badge badge-orange" style="font-size:10px">diverso</span>{% endif %}
+          </td>
+        </tr>
+        {{ cmp_row('PARAMETRI TECNICI', is_section=true) }}
+        {{ cmp_row('Spread vendita (€/unità)',   sim_a.spread_vendita,     sim_b.spread_vendita,     'raw4') }}
+        {{ cmp_row('Spread acquisto (€/unità)',  sim_a.spread_acquisto,    sim_b.spread_acquisto,    'raw4') }}
+        {{ cmp_row('Quota fissa vendita (€/mese)',sim_a.quota_fissa,       sim_b.quota_fissa,        'euro') }}
+        {{ cmp_row('Costo gestione PDP (€/mese)',sim_a.costo_gestione_pdp,sim_b.costo_gestione_pdp, 'euro') }}
+        {{ cmp_row('Consumo medio',              sim_a.consumo_medio,      sim_b.consumo_medio,      'raw4') }}
+        {{ cmp_row('COMPOSIZIONE MARGINI', is_section=true) }}
+        {{ cmp_row('Margine spread annuo',       sim_a.margine_spread_annuo, sim_b.margine_spread_annuo,'euro') }}
+        {{ cmp_row('Margine QF annuo',           sim_a.margine_qf_annuo,     sim_b.margine_qf_annuo,    'euro') }}
+        {{ cmp_row('Margine lordo',              sim_a.margine_lordo,        sim_b.margine_lordo,       'euro', bold=true) }}
+        {{ cmp_row('PROVVIGIONI', is_section=true) }}
+        {{ cmp_row('Provv. agente',              sim_a.provvigione_agente,      sim_b.provvigione_agente,      'euro') }}
+        {{ cmp_row('Provv. sub-agente',          sim_a.provvigione_sub_agente,  sim_b.provvigione_sub_agente,  'euro') }}
+        {{ cmp_row('Provv. area manager',        sim_a.provvigione_area_manager,sim_b.provvigione_area_manager,'euro') }}
+        {{ cmp_row('Totale provvigioni',         sim_a.totale_provvigioni,      sim_b.totale_provvigioni,      'euro', bold=true) }}
+        {{ cmp_row('RISULTATO', is_section=true) }}
+        {{ cmp_row('Margine netto',              sim_a.margine_netto,        sim_b.margine_netto,       'euro', bold=true) }}
+        {{ cmp_row('Margine %',                  sim_a.margine_percentuale,  sim_b.margine_percentuale, 'pct',  bold=true) }}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Grafico comparativo -->
+<div class="card card-body">
+  <div class="section-title" style="margin-bottom:16px">Visualizzazione grafica</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+    <div>
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-align:center">Composizione margini</div>
+      <div style="height:280px;position:relative"><canvas id="chartBar"></canvas></div>
+    </div>
+    <div>
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px;text-align:center">Breakdown voci (A vs B)</div>
+      <div style="height:280px;position:relative"><canvas id="chartCmp"></canvas></div>
+    </div>
+  </div>
+</div>
+
+{% elif sid_a or sid_b %}
+<div class="alert alert-warning">Seleziona entrambi gli scenari per confrontarli.</div>
+{% else %}
+<div class="empty">
+  <div class="empty-icon">⚖</div>
+  <div class="empty-title">Seleziona due simulazioni</div>
+  <div class="empty-desc">Usa i menu sopra per scegliere gli scenari A e B da confrontare.</div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if sim_a and sim_b %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const A = {
+  lordo:    {{ sim_a.margine_lordo or 0 }},
+  spread:   {{ sim_a.margine_spread_annuo or 0 }},
+  qf:       {{ sim_a.margine_qf_annuo or 0 }},
+  pAg:      {{ sim_a.provvigione_agente or 0 }},
+  pSub:     {{ sim_a.provvigione_sub_agente or 0 }},
+  pAM:      {{ sim_a.provvigione_area_manager or 0 }},
+  netto:    {{ sim_a.margine_netto or 0 }},
+  provv:    {{ sim_a.totale_provvigioni or 0 }},
+};
+const B = {
+  lordo:    {{ sim_b.margine_lordo or 0 }},
+  spread:   {{ sim_b.margine_spread_annuo or 0 }},
+  qf:       {{ sim_b.margine_qf_annuo or 0 }},
+  pAg:      {{ sim_b.provvigione_agente or 0 }},
+  pSub:     {{ sim_b.provvigione_sub_agente or 0 }},
+  pAM:      {{ sim_b.provvigione_area_manager or 0 }},
+  netto:    {{ sim_b.margine_netto or 0 }},
+  provv:    {{ sim_b.totale_provvigioni or 0 }},
+};
+
+const OPTS = {
+  animation:false, responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#8b949e',font:{size:11}}},
+           tooltip:{callbacks:{label:c=>fmtEuro(Math.abs(c.raw))}}},
+  scales:{x:{ticks:{color:'#8b949e',font:{size:10}},grid:{display:false},border:{display:false}},
+          y:{ticks:{color:'#8b949e',font:{size:10},callback:v=>'€'+(Math.abs(v)>=1000?fmtIT(v/1000,1)+'k':fmtIT(v,0))},
+             grid:{color:'#21262d'},border:{display:false}}}
+};
+
+// Chart 1 — waterfall affiancato A/B
+new Chart(document.getElementById('chartBar'),{
+  type:'bar',
+  data:{
+    labels:['M. Spread','M. QF','Provv. Ag.','Provv. Sub','Provv. AM','M. Netto'],
+    datasets:[
+      {label:'Scenario A',backgroundColor:'rgba(79,110,247,.75)',
+       data:[A.spread,A.qf,-A.pAg,-A.pSub,-A.pAM,A.netto],borderRadius:3,borderSkipped:false},
+      {label:'Scenario B',backgroundColor:'rgba(188,140,255,.75)',
+       data:[B.spread,B.qf,-B.pAg,-B.pSub,-B.pAM,B.netto],borderRadius:3,borderSkipped:false},
+    ]
+  },
+  options:{...OPTS, scales:{...OPTS.scales,x:{...OPTS.scales.x,ticks:{...OPTS.scales.x.ticks,font:{size:9}}}}}
+});
+
+// Chart 2 — confronto lordo/provv/netto
+new Chart(document.getElementById('chartCmp'),{
+  type:'bar',
+  data:{
+    labels:['M. Lordo','Provvigioni','M. Netto'],
+    datasets:[
+      {label:'Scenario A',backgroundColor:['rgba(79,110,247,.8)','rgba(248,81,73,.7)','rgba(63,185,80,.8)'],
+       data:[A.lordo,A.provv,A.netto],borderRadius:4,borderSkipped:false},
+      {label:'Scenario B',backgroundColor:['rgba(188,140,255,.8)','rgba(240,136,62,.7)','rgba(88,166,255,.8)'],
+       data:[B.lordo,B.provv,B.netto],borderRadius:4,borderSkipped:false},
+    ]
+  },
+  options:OPTS
+});
+</script>
+{% endif %}
+{% endblock %}

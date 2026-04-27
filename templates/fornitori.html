@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Fornitori — UFLOW{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Fornitori</h1>
+    <p class="page-subtitle" id="subtitleCount">{{ fornitori|length }} fornitori totali</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal()">+ Nuovo fornitore</button>
+</div>
+
+<!-- Barra di ricerca -->
+<div class="search-bar" style="max-width:360px;margin-bottom:16px">
+  <input type="text" id="searchInput" placeholder="Cerca per nome, commodity, pagamento..."
+         oninput="filterTable()">
+</div>
+
+<div class="table-wrap overflow-x">
+  <table id="fornitoriTable">
+    <thead>
+      <tr><th>Nome</th><th>Commodity</th><th>Spread acquisto</th><th>Costo gest. PdP</th><th>Pagamento</th><th>Azioni</th></tr>
+    </thead>
+    <tbody id="fornitoriBody">
+      {% if not fornitori %}
+      <tr><td colspan="6">
+        <div class="empty"><div class="empty-icon">🏭</div>
+        <div class="empty-title">Nessun fornitore</div>
+        <div class="empty-sub">Crea il primo fornitore con il pulsante in alto</div></div>
+      </td></tr>
+      {% endif %}
+      {% for f in fornitori %}
+      <tr data-search="{{ (f.nome + ' ' + f.commodity + ' ' + f.tipologia_pagamento)|lower }}">
+        <td><strong>{{ f.nome }}</strong></td>
+        <td><span class="badge {{ 'badge-orange' if f.commodity == 'LUCE' else ('badge-green' if f.commodity == 'ENTRAMBI' else 'badge-blue') }}">{{ f.commodity }}</span></td>
+        <td class="mono">{{ f.spread_acquisto }}</td>
+        <td class="mono">€ {{ f.costo_gestione_pdp }}/mese</td>
+        <td>{{ f.tipologia_pagamento }}</td>
+        <td>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" onclick='openModal({{ f|tojson }})'>Modifica</button>
+            <form method="POST" action="/fornitori/elimina/{{ f.id }}" style="display:inline"
+                  onsubmit="return confirm('Eliminare questo fornitore?')">
+              <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div id="noResults" style="display:none;text-align:center;padding:40px;color:var(--text3);font-size:13px">
+  Nessun risultato per la ricerca corrente.
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalTitle">Nuovo fornitore</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <form method="POST" action="/fornitori/salva">
+      <input type="hidden" name="id" id="fId">
+      <div class="form-grid form-grid-2">
+        <div class="full-width form-group">
+          <label>Nome fornitore *</label>
+          <input type="text" name="nome" id="fNome" required>
+        </div>
+        <div class="form-group">
+          <label>Commodity</label>
+          <select name="commodity" id="fCommodity">
+            <option value="LUCE">Luce</option>
+            <option value="GAS">Gas</option>
+            <option value="ENTRAMBI">Entrambi</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tipologia pagamento</label>
+          <input type="text" name="tipologia_pagamento" id="fPagamento" value="Open credit">
+        </div>
+        <div class="form-group">
+          <label>Spread acquisto</label>
+          <input type="number" name="spread_acquisto" id="fSpread" step="0.001" value="0">
+        </div>
+        <div class="form-group">
+          <label>Costo gestione PdP (€/mese)</label>
+          <input type="number" name="costo_gestione_pdp" id="fCosto" step="0.01" value="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+        <button type="submit" class="btn btn-primary">Salva</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openModal(o){
+  document.getElementById('modal').classList.add('open');
+  if(o){
+    document.getElementById('modalTitle').textContent  = 'Modifica fornitore';
+    document.getElementById('fId').value               = o.id;
+    document.getElementById('fNome').value             = o.nome;
+    document.getElementById('fCommodity').value        = o.commodity;
+    document.getElementById('fSpread').value           = o.spread_acquisto;
+    document.getElementById('fCosto').value            = o.costo_gestione_pdp;
+    document.getElementById('fPagamento').value        = o.tipologia_pagamento;
+  } else {
+    document.getElementById('modalTitle').textContent  = 'Nuovo fornitore';
+    document.getElementById('fId').value               = '';
+    document.getElementById('fNome').value             = '';
+    document.getElementById('fCommodity').value        = 'LUCE';
+    document.getElementById('fSpread').value           = 0;
+    document.getElementById('fCosto').value            = 0;
+    document.getElementById('fPagamento').value        = 'Open credit';
+  }
+}
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+document.getElementById('modal').addEventListener('click', e => { if(e.target === e.currentTarget) closeModal(); });
+
+// ── Ricerca ────────────────────────────────────────────────────────────────────
+function filterTable(){
+  const q     = document.getElementById('searchInput').value.toLowerCase().trim();
+  const rows  = document.querySelectorAll('#fornitoriBody tr[data-search]');
+  let visible = 0;
+  rows.forEach(row => {
+    const match = !q || row.dataset.search.includes(q);
+    row.style.display = match ? '' : 'none';
+    if(match) visible++;
+  });
+  document.getElementById('subtitleCount').textContent = visible + ' fornitori' + (q ? ' trovati' : ' totali');
+  document.getElementById('noResults').style.display = visible === 0 ? 'block' : 'none';
+  document.getElementById('fornitoriTable').style.display = visible === 0 ? 'none' : '';
+}
+</script>
+{% endblock %}

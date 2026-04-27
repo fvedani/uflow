@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Provvigioni — UFLOW{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Piani provvigionali</h1>
+    <p class="page-subtitle" id="subtitleCount">{{ piani|length }} piani totali</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal()">+ Nuovo piano</button>
+</div>
+
+<!-- Barra di ricerca -->
+<div class="search-bar" style="max-width:360px;margin-bottom:16px">
+  <input type="text" id="searchInput" placeholder="Cerca per nome piano..."
+         oninput="filterPiani()">
+</div>
+
+{% if not piani %}
+<div class="card">
+  <div class="empty"><div class="empty-icon">💰</div>
+  <div class="empty-title">Nessun piano provvigionale</div>
+  <div class="empty-sub">Crea il primo piano con il pulsante in alto</div></div>
+</div>
+{% endif %}
+
+<div id="pianiContainer" style="display:flex;flex-direction:column;gap:12px">
+{% for p in piani %}
+<div class="card piano-card" data-search="{{ p.nome_piano|lower }}">
+  <div class="card-header" style="cursor:pointer" onclick="toggle('d{{ loop.index }}','a{{ loop.index }}')">
+    <div style="flex:1"><strong style="font-size:15px">{{ p.nome_piano }}</strong></div>
+    <div class="flex gap-4 flex-wrap" style="margin-right:16px">
+      {% for label, val in [('Gettone Ag.', p.gettone_agente), ('Gettone Sub.', p.gettone_sub_agente), ('Ric./mese Ag.', p.ricorrente_mese_agente), ('Ric./mese AM', p.ricorrente_mese_area_manager)] %}
+      <div style="text-align:right">
+        <div class="text-sm text-muted">{{ label }}</div>
+        <div class="mono" style="font-weight:500">€ {{ val }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="flex gap-2">
+      <button class="btn btn-secondary btn-sm" onclick='event.stopPropagation();openModal({{ p|tojson }})'>Modifica</button>
+      <form method="POST" action="/provvigioni/elimina/{{ p.id }}" style="display:inline"
+            onsubmit="return confirm('Eliminare questo piano?')">
+        <button class="btn btn-danger btn-sm" type="submit" onclick="event.stopPropagation()">Elimina</button>
+      </form>
+    </div>
+    <span id="a{{ loop.index }}" style="color:var(--text3);font-size:12px;margin-left:10px">▼</span>
+  </div>
+  <div id="d{{ loop.index }}" style="display:none;border-top:1px solid var(--border)">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr">
+      <div style="padding:16px;border-right:1px solid var(--border)">
+        <div class="section-title" style="color:var(--accent2)">Agente</div>
+        {% for label, val in [('Gettone', p.gettone_agente),('Ric. €/mese', p.ricorrente_mese_agente),('Ric. €/consumo', p.ricorrente_consumo_agente)] %}
+        <div class="flex justify-between" style="margin-bottom:8px">
+          <span class="text-muted text-sm">{{ label }}</span>
+          <span class="mono" style="font-size:13px">€ {{ val }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="padding:16px;border-right:1px solid var(--border)">
+        <div class="section-title" style="color:var(--purple)">Sub-Agente</div>
+        {% for label, val in [('Gettone', p.gettone_sub_agente),('Ric. €/mese', p.ricorrente_mese_sub_agente),('Ric. €/consumo', p.ricorrente_consumo_sub_agente)] %}
+        <div class="flex justify-between" style="margin-bottom:8px">
+          <span class="text-muted text-sm">{{ label }}</span>
+          <span class="mono" style="font-size:13px">€ {{ val }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="padding:16px">
+        <div class="section-title" style="color:var(--orange)">Area Manager</div>
+        {% for label, val in [('Ric. €/mese', p.ricorrente_mese_area_manager),('Ric. €/consumo', p.ricorrente_consumo_area_manager)] %}
+        <div class="flex justify-between" style="margin-bottom:8px">
+          <span class="text-muted text-sm">{{ label }}</span>
+          <span class="mono" style="font-size:13px">€ {{ val }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+</div>
+<div id="noResults" style="display:none;text-align:center;padding:40px;color:var(--text3);font-size:13px">
+  Nessun piano trovato per la ricerca corrente.
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalTitle">Nuovo piano provvigionale</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <form method="POST" action="/provvigioni/salva">
+      <input type="hidden" name="id" id="fId">
+      <div class="form-grid form-grid-2">
+        <div class="full-width form-group">
+          <label>Nome piano *</label>
+          <input type="text" name="nome_piano" id="fNome" required>
+        </div>
+
+        <div class="form-section-title"><span class="sect-agente">Agente</span></div>
+        <div class="form-group"><label>Gettone Agente (€)</label>
+          <input type="number" name="gettone_agente" id="fGA" step="0.01" value="0"></div>
+        <div class="form-group"><label>Ricorrente €/mese Agente</label>
+          <input type="number" name="ricorrente_mese_agente" id="fRMA" step="0.01" value="0"></div>
+        <div class="form-group"><label>Ricorrente €/consumo Agente</label>
+          <input type="number" name="ricorrente_consumo_agente" id="fRCA" step="0.001" value="0"></div>
+
+        <div class="form-section-title"><span class="sect-sub">Sub-Agente</span></div>
+        <div class="form-group"><label>Gettone Sub-Agente (€)</label>
+          <input type="number" name="gettone_sub_agente" id="fGS" step="0.01" value="0"></div>
+        <div class="form-group"><label>Ricorrente €/mese Sub-Agente</label>
+          <input type="number" name="ricorrente_mese_sub_agente" id="fRMS" step="0.01" value="0"></div>
+        <div class="form-group"><label>Ricorrente €/consumo Sub-Agente</label>
+          <input type="number" name="ricorrente_consumo_sub_agente" id="fRCS" step="0.001" value="0"></div>
+
+        <div class="form-section-title"><span class="sect-am">Area Manager</span></div>
+        <div class="form-group"><label>Ricorrente €/mese Area Manager</label>
+          <input type="number" name="ricorrente_mese_area_manager" id="fRMAM" step="0.01" value="0"></div>
+        <div class="form-group"><label>Ricorrente €/consumo Area Manager</label>
+          <input type="number" name="ricorrente_consumo_area_manager" id="fRCAM" step="0.001" value="0"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+        <button type="submit" class="btn btn-primary">Salva</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggle(detailId, arrowId){
+  const d = document.getElementById(detailId);
+  const a = document.getElementById(arrowId);
+  const open = d.style.display === 'none';
+  d.style.display = open ? 'block' : 'none';
+  a.textContent   = open ? '▲' : '▼';
+}
+
+const FIELD_MAP = [
+  ['fGA',   'gettone_agente'],
+  ['fRMA',  'ricorrente_mese_agente'],
+  ['fRCA',  'ricorrente_consumo_agente'],
+  ['fGS',   'gettone_sub_agente'],
+  ['fRMS',  'ricorrente_mese_sub_agente'],
+  ['fRCS',  'ricorrente_consumo_sub_agente'],
+  ['fRMAM', 'ricorrente_mese_area_manager'],
+  ['fRCAM', 'ricorrente_consumo_area_manager'],
+];
+
+function openModal(o){
+  document.getElementById('modal').classList.add('open');
+  if(o){
+    document.getElementById('modalTitle').textContent = 'Modifica piano';
+    document.getElementById('fId').value   = o.id;
+    document.getElementById('fNome').value = o.nome_piano;
+    FIELD_MAP.forEach(([id, key]) => document.getElementById(id).value = o[key]);
+  } else {
+    document.getElementById('modalTitle').textContent = 'Nuovo piano provvigionale';
+    document.getElementById('fId').value   = '';
+    document.getElementById('fNome').value = '';
+    FIELD_MAP.forEach(([id]) => document.getElementById(id).value = 0);
+  }
+}
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+document.getElementById('modal').addEventListener('click', e => { if(e.target === e.currentTarget) closeModal(); });
+
+// ── Ricerca ────────────────────────────────────────────────────────────────────
+function filterPiani(){
+  const q     = document.getElementById('searchInput').value.toLowerCase().trim();
+  const cards = document.querySelectorAll('.piano-card');
+  let visible = 0;
+  cards.forEach(card => {
+    const match = !q || card.dataset.search.includes(q);
+    card.style.display = match ? '' : 'none';
+    if(match) visible++;
+  });
+  document.getElementById('subtitleCount').textContent = visible + ' piani' + (q ? ' trovati' : ' totali');
+  document.getElementById('noResults').style.display = visible === 0 ? 'block' : 'none';
+}
+</script>
+{% endblock %}

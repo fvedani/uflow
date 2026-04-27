@@ -1,0 +1,537 @@
+{% extends "base.html" %}
+{% block title %}{% if view == 'dettaglio' %}{{ pf.nome }} — {% endif %}Portafogli — UFLOW{% endblock %}
+
+{% block content %}
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# VISTA LISTA PORTAFOGLI                                                      #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{% if view != 'dettaglio' %}
+
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Portafogli clienti</h1>
+    <p class="page-subtitle">Raggruppa clienti per agente o segmento, monitora i margini aggregati e identifica le posizioni in perdita</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('modalNuovoPf')">+ Nuovo portafoglio</button>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ 'success' if cat=='success' else ('warning' if cat=='warning' else 'info') }}" style="margin-bottom:14px">{{ msg }}</div>
+  {% endfor %}
+{% endwith %}
+
+{% if portafogli %}
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+  {% for pf in portafogli %}
+  {% set netto = pf.tot_netto or 0 %}
+  {% set sem_color = 'rgba(16,185,129,.45)' if pf.semaforo=='green' else ('rgba(245,158,11,.45)' if pf.semaforo=='yellow' else 'rgba(239,68,68,.45)') %}
+  {% set dot_color = 'var(--green)' if pf.semaforo=='green' else ('var(--orange)' if pf.semaforo=='yellow' else 'var(--red)') %}
+  <div class="card" style="padding:0;display:flex;flex-direction:column;border-top:2px solid {{ sem_color }}">
+    <div style="padding:18px 20px 14px;flex:1;display:flex;flex-direction:column;gap:12px">
+      <div class="flex justify-between items-start">
+        <div>
+          <div style="font-weight:700;font-size:15px;letter-spacing:-.3px">{{ pf.nome }}</div>
+          {% if pf.descrizione %}<div style="font-size:11.5px;color:var(--text3);margin-top:3px">{{ pf.descrizione }}</div>{% endif %}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="width:7px;height:7px;border-radius:50%;background:{{ dot_color }};box-shadow:0 0 5px {{ dot_color }}"></div>
+          <span style="font-size:11px;color:var(--text3)">{{ pf.n_clienti or 0 }} clienti</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="stat-card" style="padding:12px 14px">
+          <div class="stat-label" style="font-size:9.5px">M. Lordo tot.</div>
+          <div class="stat-value color-text" style="font-size:16px">
+            {% if pf.tot_lordo %}€ {{ pf.tot_lordo|n2 }}{% else %}—{% endif %}
+          </div>
+        </div>
+        <div class="stat-card" style="padding:12px 14px">
+          <div class="stat-label" style="font-size:9.5px">M. Netto tot.</div>
+          <div class="stat-value {{ 'color-green' if netto >= 0 else 'color-red' }}" style="font-size:16px">
+            {% if pf.tot_netto is not none %}€ {{ netto|n2 }}{% else %}—{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-2" style="padding:12px 16px;border-top:1px solid var(--border);background:var(--bg3)">
+      <a href="/portafogli/{{ pf.id }}" class="btn btn-primary btn-sm" style="flex:1;justify-content:center">Apri portafoglio →</a>
+      <a href="/portafogli/{{ pf.id }}/export" class="btn btn-secondary btn-sm" title="Esporta Excel">📥</a>
+      <form method="POST" action="/portafogli/{{ pf.id }}/elimina"
+            onsubmit='return confirm({{ ("Eliminare il portafoglio «" ~ pf.nome ~ "» e tutti i suoi clienti?")|tojson }})' style="margin:0">
+        <button class="btn btn-danger btn-sm" title="Elimina">🗑</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="empty">
+  <div class="empty-icon">📁</div>
+  <div class="empty-title">Nessun portafoglio</div>
+  <div class="empty-desc">Crea il tuo primo portafoglio per aggregare clienti e analizzare i margini.</div>
+  <button class="btn btn-primary" onclick="openModal('modalNuovoPf')" style="margin-top:16px">+ Crea portafoglio</button>
+</div>
+{% endif %}
+
+<!-- Modal nuovo portafoglio -->
+<div id="modalNuovoPf" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal('modalNuovoPf')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span class="modal-title">Nuovo portafoglio</span>
+      <button class="modal-close" onclick="closeModal('modalNuovoPf')">✕</button>
+    </div>
+    <form method="POST" action="/portafogli/crea">
+      <div class="form-group">
+        <label>Nome portafoglio *</label>
+        <input type="text" name="nome" required placeholder="Es. Agente Mario Rossi – Q1 2025">
+      </div>
+      <div class="form-group">
+        <label>Descrizione (opzionale)</label>
+        <input type="text" name="descrizione" placeholder="Breve descrizione del portafoglio">
+      </div>
+      <div class="flex gap-2" style="margin-top:16px;justify-content:flex-end">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalNuovoPf')">Annulla</button>
+        <button type="submit" class="btn btn-primary">Crea portafoglio</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# VISTA DETTAGLIO PORTAFOGLIO                                                 #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{% else %}
+
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <a href="/portafogli" class="btn btn-secondary btn-sm">← Portafogli</a>
+    <div>
+      <h1 class="page-title">{{ pf.nome }}</h1>
+      {% if pf.descrizione %}<p class="page-subtitle">{{ pf.descrizione }}</p>{% endif %}
+    </div>
+  </div>
+  <div class="flex gap-2">
+    <a href="/portafogli/{{ pf.id }}/export" class="btn btn-secondary">📥 Esporta Excel</a>
+    <a href="/portafogli/template-import" class="btn btn-secondary">📋 Template import</a>
+    <button class="btn btn-secondary" onclick="openModal('modalImport')">⬆ Importa file</button>
+    <button class="btn btn-primary"    onclick="openModal('modalAggiungi')">+ Aggiungi cliente</button>
+  </div>
+</div>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="alert alert-{{ 'success' if cat=='success' else ('warning' if cat=='warning' else 'info') }}" style="margin-bottom:14px">{{ msg }}</div>
+  {% endfor %}
+{% endwith %}
+
+<!-- KPI aggregati -->
+<div class="stat-grid stat-grid-4" style="margin-bottom:16px">
+  <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.45)">
+    <div class="stat-label">Clienti totali</div>
+    <div class="stat-value color-accent">{{ n_clienti }}</div>
+  </div>
+  <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.3)">
+    <div class="stat-label">Margine lordo totale</div>
+    <div class="stat-value color-text">€ {{ tot_lordo|n2 }}</div>
+  </div>
+  <div class="stat-card" style="border-top:2px solid rgba(239,68,68,.35)">
+    <div class="stat-label">Provvigioni totali</div>
+    <div class="stat-value color-red">€ {{ tot_provv|n2 }}</div>
+  </div>
+  <div class="stat-card" style="border-top:2px solid {{ 'rgba(16,185,129,.5)' if tot_netto >= 0 else 'rgba(239,68,68,.5)' }}">
+    <div class="stat-label">Margine netto totale</div>
+    <div class="stat-value {{ 'color-green' if tot_netto >= 0 else 'color-red' }}">€ {{ tot_netto|n2 }}</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
+  <div class="stat-card" style="padding:16px 18px">
+    <div class="stat-label">M. netto medio / cliente</div>
+    <div class="stat-value {{ 'color-green' if avg_netto >= 0 else 'color-red' }}" style="font-size:19px">€ {{ avg_netto|n2 }}</div>
+  </div>
+  <div class="stat-card" style="padding:16px 18px">
+    <div class="stat-label">Margine % medio</div>
+    <div class="stat-value {{ 'color-green' if avg_pct >= 0 else 'color-red' }}" style="font-size:19px">{{ avg_pct|n1 }}%</div>
+  </div>
+  <div class="stat-card" style="padding:16px 18px;display:flex;align-items:center;justify-content:center">
+    <form method="POST" action="/portafogli/{{ pf.id }}/ricalcola" style="margin:0">
+      <button class="btn btn-secondary" title="Ricalcola margini con i dati attuali di offerte e fornitori">
+        🔄 Ricalcola margini
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Breakdown commodity + mini donut -->
+{% if clienti %}
+{% set luce_list = clienti | selectattr('commodity','equalto','LUCE') | list %}
+{% set gas_list  = clienti | selectattr('commodity','equalto','GAS')  | list %}
+{% if luce_list or gas_list %}
+<div style="display:grid;grid-template-columns:auto 1fr;gap:16px;margin-bottom:20px;align-items:center">
+
+  <!-- Mini donut distribuzione -->
+  <div class="card card-body" style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:160px">
+    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:var(--text4);margin-bottom:2px">Distribuzione</div>
+    <div style="position:relative;width:90px;height:90px">
+      <canvas id="pfDonut" width="90" height="90"></canvas>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
+        <div style="font-size:16px;font-weight:700;font-family:var(--mono)">{{ clienti|length }}</div>
+        <div style="font-size:8px;color:var(--text3)">clienti</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;font-size:10px;color:var(--text3)">
+      {% if luce_list %}<span style="color:var(--orange)">● Luce {{ luce_list|length }}</span>{% endif %}
+      {% if gas_list %}<span style="color:var(--accent2)">● Gas {{ gas_list|length }}</span>{% endif %}
+    </div>
+  </div>
+
+  <!-- Stat cards affiancate -->
+  <div style="display:grid;grid-template-columns:{% if luce_list and gas_list %}1fr 1fr{% else %}1fr{% endif %};gap:12px">
+    {% if luce_list %}
+    {% set luce_netto = luce_list | sum(attribute='margine_netto') %}
+    {% set luce_avg_n = (luce_netto / luce_list|length) %}
+    <div class="stat-card" style="border-color:rgba(245,158,11,.3)">
+      <div class="stat-label">🔆 LUCE — {{ luce_list|length }} clienti</div>
+      <div class="stat-value color-orange" style="font-size:17px">€{{ luce_netto|n2 }}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">
+        netto totale · Ø <span class="{{ 'color-green' if luce_avg_n >= 0 else 'color-red' }}">€{{ luce_avg_n|n2 }}</span>
+      </div>
+    </div>
+    {% endif %}
+    {% if gas_list %}
+    {% set gas_netto = gas_list | sum(attribute='margine_netto') %}
+    {% set gas_avg_n = (gas_netto / gas_list|length) %}
+    <div class="stat-card" style="border-color:rgba(16,185,129,.3)">
+      <div class="stat-label">🔥 GAS — {{ gas_list|length }} clienti</div>
+      <div class="stat-value color-accent" style="font-size:17px">€{{ gas_netto|n2 }}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">
+        netto totale · Ø <span class="{{ 'color-green' if gas_avg_n >= 0 else 'color-red' }}">€{{ gas_avg_n|n2 }}</span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endif %}
+{% endif %}
+
+<!-- Tabella clienti -->
+<div class="card card-body">
+  <div class="flex justify-between items-center" style="margin-bottom:14px">
+    <div class="section-title" style="margin:0">Elenco clienti</div>
+    <input type="text" id="searchClienti" placeholder="🔍 Cerca cliente…"
+           oninput="filterClienti()"
+           style="width:200px;padding:6px 10px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text1)">
+  </div>
+
+  {% if clienti %}
+  <div class="table-wrap overflow-x">
+    <table id="tblClienti">
+      <thead>
+        <tr>
+          <th class="pf-sort" onclick="sortPf('nome_cliente')" style="cursor:pointer;user-select:none">Cliente <span class="pf-sort-icon" id="psort-nome_cliente">↕</span></th>
+          <th>Offerta</th><th>Fornitore</th><th>Piano</th>
+          <th>Comm.</th>
+          <th class="pf-sort" onclick="sortPf('consumo_override')" style="cursor:pointer;user-select:none;text-align:right">Consumo <span class="pf-sort-icon" id="psort-consumo_override">↕</span></th>
+          <th class="pf-sort" onclick="sortPf('margine_lordo')" style="cursor:pointer;user-select:none;text-align:right">M. Lordo <span class="pf-sort-icon" id="psort-margine_lordo">↕</span></th>
+          <th style="text-align:right">Provvigioni</th>
+          <th class="pf-sort" onclick="sortPf('margine_netto')" style="cursor:pointer;user-select:none;text-align:right">M. Netto <span class="pf-sort-icon" id="psort-margine_netto">↓</span></th>
+          <th class="pf-sort" onclick="sortPf('margine_percentuale')" style="cursor:pointer;user-select:none;text-align:right">M. % <span class="pf-sort-icon" id="psort-margine_percentuale">↕</span></th>
+          <th>Note</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="tblClientiBody">
+        {% for c in clienti | sort(attribute='margine_netto', reverse=true) %}
+        {% set mn_class = 'color-green' if (c.margine_netto or 0) >= 0 else 'color-red' %}
+        <tr data-search="{{ (c.nome_cliente or '')|lower }} {{ (c.nome_offerta or '')|lower }}"
+            data-nome_cliente="{{ (c.nome_cliente or '')|lower }}"
+            data-consumo_override="{{ c.consumo_override or 0 }}"
+            data-margine_lordo="{{ c.margine_lordo or 0 }}"
+            data-margine_netto="{{ c.margine_netto or 0 }}"
+            data-margine_percentuale="{{ c.margine_percentuale or 0 }}">
+          <td><strong>{{ c.nome_cliente or '—' }}</strong></td>
+          <td class="text-muted">{{ c.nome_offerta or '—' }}</td>
+          <td class="text-muted" style="font-size:11px">{{ c.nome_fornitore or '—' }}</td>
+          <td class="text-muted" style="font-size:11px">{{ c.nome_piano or '—' }}</td>
+          <td>
+            {% if c.commodity == 'LUCE' %}<span class="badge badge-orange">🔆 Luce</span>
+            {% elif c.commodity == 'GAS' %}<span class="badge badge-blue">🔥 Gas</span>
+            {% endif %}
+          </td>
+          <td class="mono" style="text-align:right">
+            {{ '%.4f'|format(c.consumo_override or 0) }}
+          </td>
+          <td class="mono color-accent" style="text-align:right">€{{ (c.margine_lordo or 0)|n2 }}</td>
+          <td class="mono color-red" style="text-align:right">€{{ (c.totale_provvigioni or 0)|n2 }}</td>
+          <td class="mono fw-600 {{ mn_class }}" style="text-align:right">€{{ (c.margine_netto or 0)|n2 }}</td>
+          <td class="mono text-muted" style="text-align:right">
+            {% if c.margine_percentuale is not none %}{{ c.margine_percentuale|n1 }}%{% else %}—{% endif %}
+          </td>
+          <td style="font-size:11px;color:var(--text3);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ c.note or '—' }}
+          </td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-secondary btn-sm"
+                    onclick='openEditCliente({{ c.id }}, {{ (c.nome_cliente or "")|tojson }}, {{ c.consumo_override or 0 }}, {{ (c.note or "")|tojson }})'
+                    title="Modifica consumo" style="margin-right:2px">✏️</button>
+            <button class="btn btn-danger btn-sm"
+                    onclick='eliminaCliente({{ c.id }}, this, {{ (c.nome_cliente or "questo cliente")|tojson }})'
+                    title="Rimuovi dal portafoglio">✕</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <!-- Riga totali -->
+      <tfoot>
+        <tr style="border-top:2px solid var(--border2)">
+          <td colspan="6" style="font-weight:700;color:var(--text2);font-size:12px">TOTALE ({{ n_clienti }} clienti)</td>
+          <td class="mono fw-600 color-accent" style="text-align:right">€{{ '%.2f'|format(tot_lordo) }}</td>
+          <td class="mono fw-600 color-red"    style="text-align:right">€{{ '%.2f'|format(tot_provv) }}</td>
+          <td class="mono fw-600 {{ 'color-green' if tot_netto >= 0 else 'color-red' }}" style="text-align:right">€{{ '%.2f'|format(tot_netto) }}</td>
+          <td class="mono text-muted"           style="text-align:right">{{ avg_pct|n1 }}%</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty" style="padding:40px">
+    <div class="empty-icon">👥</div>
+    <div class="empty-title">Nessun cliente nel portafoglio</div>
+    <div class="empty-desc">Aggiungi clienti manualmente o importa un file Excel/CSV.</div>
+    <div class="flex gap-2" style="margin-top:16px;justify-content:center">
+      <button class="btn btn-secondary" onclick="openModal('modalImport')">⬆ Importa file</button>
+      <button class="btn btn-primary"   onclick="openModal('modalAggiungi')">+ Aggiungi cliente</button>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+
+<!-- ── Modal aggiungi cliente ──────────────────────────────────────────────── -->
+<div id="modalAggiungi" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal('modalAggiungi')">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title">Aggiungi cliente</span>
+      <button class="modal-close" onclick="closeModal('modalAggiungi')">✕</button>
+    </div>
+    <form method="POST" action="/portafogli/{{ pf.id }}/aggiungi-cliente">
+      <div class="form-grid form-grid-2">
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Nome cliente</label>
+          <input type="text" name="nome_cliente" placeholder="Es. Azienda ABC Srl">
+        </div>
+        <div class="form-group">
+          <label>Offerta *</label>
+          <select name="offerta_id" id="selOffertaPf" onchange="onOffertaChangePf()" required>
+            <option value="">— Seleziona —</option>
+            {% for o in offerte %}
+            <option value="{{ o.id }}" data-consumo="{{ o.consumo_medio }}" data-commodity="{{ o.commodity }}">
+              {{ o.nome_offerta }} ({{ o.commodity }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Piano provvigionale *</label>
+          <select name="piano_id" required>
+            <option value="">— Seleziona —</option>
+            {% for p in piani %}
+            <option value="{{ p.id }}">{{ p.nome_piano }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Consumo individuale <span id="pfConsumoUnit" style="color:var(--text3);font-size:10px"></span></label>
+          <input type="number" name="consumo" id="pfConsumoInput" step="any" min="0"
+                 placeholder="Lascia vuoto per usare il default dell'offerta">
+        </div>
+        <div class="form-group">
+          <label>Note</label>
+          <input type="text" name="note" placeholder="Annotazioni opzionali">
+        </div>
+      </div>
+      <div class="flex gap-2" style="margin-top:16px;justify-content:flex-end">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalAggiungi')">Annulla</button>
+        <button type="submit" class="btn btn-primary">Aggiungi</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal import file ──────────────────────────────────────────────────── -->
+<div id="modalImport" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal('modalImport')">
+  <div class="modal-box" style="max-width:500px">
+    <div class="modal-header">
+      <span class="modal-title">Importa clienti da file</span>
+      <button class="modal-close" onclick="closeModal('modalImport')">✕</button>
+    </div>
+    <div class="alert alert-info" style="margin-bottom:10px;font-size:12px;flex-direction:column;align-items:flex-start;gap:6px">
+      <div><strong>Colonne richieste:</strong> <code>Nome Cliente</code>, <code>Offerta</code>, <code>Piano Provvigionale</code>, <code>Consumo</code> (opz.), <code>Note</code> (opz.)</div>
+      <div>Scarica il <a href="/portafogli/template-import" style="color:var(--accent3);font-weight:600">📋 template Excel</a> con offerte e piani già elencati.</div>
+    </div>
+    <div class="alert alert-success" style="margin-bottom:16px;font-size:12px;flex-direction:column;align-items:flex-start;gap:4px">
+      <div>✅ <strong>I clienti vengono aggiunti</strong> a quelli esistenti (nessuna sovrascrittura).</div>
+      <div>🔍 <strong>Doppioni rilevati automaticamente</strong>: clienti con lo stesso nome già presenti nel portafoglio verranno saltati.</div>
+    </div>
+    <form method="POST" action="/portafogli/{{ pf.id }}/import" enctype="multipart/form-data">
+      <div class="form-group">
+        <label>Seleziona file (.xlsx o .csv)</label>
+        <input type="file" name="file" accept=".xlsx,.csv" required
+               style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px;color:var(--text1)">
+      </div>
+      <div class="flex gap-2" style="margin-top:16px;justify-content:flex-end">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalImport')">Annulla</button>
+        <button type="submit" class="btn btn-primary">⬆ Importa</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── Modal modifica consumo cliente ─────────────────────────────────────── -->
+<div id="modalEditCliente" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal('modalEditCliente')">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <span class="modal-title">Modifica cliente</span>
+      <button class="modal-close" onclick="closeModal('modalEditCliente')">✕</button>
+    </div>
+    <form id="formEditCliente" method="POST" action="">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:14px" id="editClienteNome"></div>
+      <div class="form-group">
+        <label>Consumo individuale</label>
+        <input type="number" name="consumo" id="editConsumoInput" step="any" min="0"
+               placeholder="Lascia vuoto per mantenere il valore attuale">
+        <div style="font-size:11px;color:var(--text3);margin-top:4px">
+          I margini verranno ricalcolati automaticamente con il nuovo consumo.
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Note</label>
+        <input type="text" name="note" id="editNoteInput" placeholder="Annotazioni opzionali">
+      </div>
+      <div class="flex gap-2" style="margin-top:16px;justify-content:flex-end">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modalEditCliente')">Annulla</button>
+        <button type="submit" class="btn btn-primary">💾 Salva e ricalcola</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endif %} {# fine dettaglio #}
+{% endblock %}
+
+{% block scripts %}
+<style>
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal-box{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;width:100%;max-width:460px;box-shadow:0 24px 60px rgba(0,0,0,.6);word-break:break-word;overflow-wrap:break-word}
+.modal-box code{display:inline-block;padding:1px 5px;background:var(--bg4);border:1px solid var(--border2);border-radius:4px;font-size:11px;font-family:var(--mono);white-space:normal;word-break:break-all}
+.modal-box .alert{line-height:1.6}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.modal-title{font-size:15px;font-weight:700;color:var(--text1)}
+.modal-close{background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:2px 6px;border-radius:4px}
+.modal-close:hover{background:var(--bg4);color:var(--text1)}
+tfoot td{padding:12px 14px;font-size:12px;background:var(--bg2)}
+.pf-sort:hover{background:var(--bg4)!important;color:var(--text2)!important}
+.pf-sort-icon{opacity:.45;font-size:10px;margin-left:2px}
+.pf-sort:hover .pf-sort-icon{opacity:.9}
+</style>
+{% if view == 'dettaglio' and clienti %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+{% endif %}
+<script>
+function openModal(id){  document.getElementById(id).style.display='flex'; }
+function closeModal(id){ document.getElementById(id).style.display='none'; }
+
+function filterClienti(){
+  const q = document.getElementById('searchClienti').value.toLowerCase();
+  document.querySelectorAll('#tblClienti tbody tr').forEach(r=>{
+    r.style.display = (r.dataset.search||'').includes(q) ? '' : 'none';
+  });
+}
+
+function onOffertaChangePf(){
+  const sel = document.getElementById('selOffertaPf');
+  const opt = sel.options[sel.selectedIndex];
+  const unit = opt.dataset.commodity === 'LUCE' ? 'MWh' : 'smc';
+  const def  = opt.dataset.consumo || '';
+  document.getElementById('pfConsumoUnit').textContent = def ? `${unit} — default: ${def}` : unit;
+}
+
+async function eliminaCliente(id, btn, nome){
+  if(!confirm(`Rimuovere "${nome}" dal portafoglio?`)) return;
+  btn.disabled = true;
+  const res = await fetch(`/portafogli/{{ pf.id if view == 'dettaglio' else 0 }}/elimina-cliente/${id}`, {method:'POST'});
+  if(res.ok){
+    btn.closest('tr').remove();
+  } else {
+    btn.disabled = false;
+    alert('Errore durante la rimozione.');
+  }
+}
+
+// ── Edit consumo modal ─────────────────────────────────────────────────────────
+function openEditCliente(id, nome, consumo, note){
+  document.getElementById('editClienteNome').textContent = 'Cliente: ' + nome;
+  document.getElementById('editConsumoInput').value = consumo || '';
+  document.getElementById('editNoteInput').value = note || '';
+  document.getElementById('formEditCliente').action = `/portafogli/{{ pf.id if view == 'dettaglio' else 0 }}/clienti/${id}/aggiorna`;
+  openModal('modalEditCliente');
+}
+
+// ── Sort tabella clienti ────────────────────────────────────────────────────────
+let pfSortCol = 'margine_netto', pfSortDir = -1;
+function sortPf(col){
+  if(pfSortCol === col) pfSortDir *= -1;
+  else { pfSortCol = col; pfSortDir = -1; }
+  document.querySelectorAll('.pf-sort-icon').forEach(el => el.textContent = '↕');
+  const icon = document.getElementById('psort-' + col);
+  if(icon) icon.textContent = pfSortDir === 1 ? '↑' : '↓';
+  const tbody = document.getElementById('tblClientiBody');
+  if(!tbody) return;
+  const rows = [...tbody.querySelectorAll('tr')];
+  rows.sort((a,b)=>{
+    let av = a.dataset[col] || '', bv = b.dataset[col] || '';
+    const an = parseFloat(av), bn = parseFloat(bv);
+    if(!isNaN(an) && !isNaN(bn)){ return (an - bn) * pfSortDir; }
+    return av.localeCompare(bv) * pfSortDir;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+// ── Mini donut distribuzione commodity ─────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', ()=>{
+  const el = document.getElementById('pfDonut');
+  if(!el) return;
+  const nL = {{ (clienti|selectattr('commodity','equalto','LUCE')|list|length) if clienti else 0 }};
+  const nG = {{ (clienti|selectattr('commodity','equalto','GAS')|list|length)  if clienti else 0 }};
+  if(nL + nG === 0) return;
+  new Chart(el, {
+    type:'doughnut',
+    data:{
+      labels:['Luce','Gas'],
+      datasets:[{
+        data:[nL, nG],
+        backgroundColor:['rgba(245,158,11,.7)','rgba(16,185,129,.7)'],
+        borderColor:['rgba(245,158,11,.9)','rgba(16,185,129,.9)'],
+        borderWidth:1.5, hoverOffset:3
+      }]
+    },
+    options:{
+      cutout:'65%', responsive:false,
+      animation:{duration:400},
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#13131a', borderColor:'rgba(16,185,129,.25)', borderWidth:1,
+          titleColor:'#eeeef2', bodyColor:'#9898a8', padding:8, cornerRadius:7,
+          callbacks:{label:c=>`${c.label}: ${c.raw} clienti (${((c.raw/(nL+nG))*100).toFixed(0)}%)`}
+        }
+      }
+    }
+  });
+});
+</script>
+{% endblock %}

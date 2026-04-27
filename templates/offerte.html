@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Offerte — UFLOW{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Offerte (CTE)</h1>
+    <p class="page-subtitle" id="subtitleCount">{{ offerte|length }} offerte totali</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal()">+ Nuova offerta</button>
+</div>
+
+<!-- Barra di ricerca -->
+<div class="search-bar" style="max-width:360px;margin-bottom:16px">
+  <input type="text" id="searchInput" placeholder="Cerca per nome, canale, tipo..."
+         oninput="filterTable()">
+</div>
+
+<div class="table-wrap overflow-x">
+  <table id="offerteTable">
+    <thead>
+      <tr>
+        <th>Nome offerta</th><th>Tipo</th><th>Commodity</th><th>Tipo consumo</th>
+        <th>Spread</th><th>Quota fissa</th><th>Cons. medio</th><th>Sconto</th><th>Stato</th><th>Azioni</th>
+      </tr>
+    </thead>
+    <tbody id="offerteBody">
+      {% if not offerte %}
+      <tr><td colspan="10">
+        <div class="empty"><div class="empty-icon">📋</div>
+        <div class="empty-title">Nessuna offerta</div>
+        <div class="empty-sub">Crea la prima offerta con il pulsante in alto</div></div>
+      </td></tr>
+      {% endif %}
+      {% for o in offerte %}
+      <tr data-search="{{ (o.nome_offerta + ' ' + o.canale + ' ' + o.tipo + ' ' + o.commodity + ' ' + o.tipo_consumo + ' ' + o.stato)|lower }}">
+        <td><strong>{{ o.nome_offerta }}</strong></td>
+        <td><span class="badge {{ 'badge-blue' if o.tipo == 'DIREZIONALE' else 'badge-orange' }}">{{ o.tipo }}</span></td>
+        <td><span class="badge {{ 'badge-orange' if o.commodity == 'LUCE' else 'badge-blue' }}">{{ o.commodity }}</span></td>
+        <td>{{ o.tipo_consumo }}</td>
+        <td class="mono">{{ o.spread }}</td>
+        <td class="mono">€ {{ o.quota_fissa }}/mese</td>
+        <td class="mono">{{ o.consumo_medio }} {{ 'MWh' if o.commodity == 'LUCE' else 'smc' }}</td>
+        <td class="mono">{% if o.sconto %}€ {{ o.sconto|n2 }}{% else %}—{% endif %}</td>
+        <td><span class="badge {{ 'badge-green' if o.stato == 'ATTIVA' else 'badge-red' }}">{{ o.stato }}</span></td>
+        <td>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" onclick='openModal({{ o|tojson }})'>Modifica</button>
+            <form method="POST" action="/offerte/elimina/{{ o.id }}" style="display:inline"
+                  onsubmit="return confirm('Eliminare questa offerta?')">
+              <button class="btn btn-danger btn-sm" type="submit">Elimina</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div id="noResults" style="display:none;text-align:center;padding:40px;color:var(--text3);font-size:13px">
+  Nessun risultato per la ricerca corrente.
+</div>
+
+<!-- Modal offerta -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modalTitle">Nuova offerta</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <form method="POST" action="/offerte/salva">
+      <input type="hidden" name="id" id="fId">
+      <div class="form-grid form-grid-2">
+        <div class="full-width form-group">
+          <label>Nome offerta *</label>
+          <input type="text" name="nome_offerta" id="fNome" required>
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select name="tipo" id="fTipo">
+            <option value="AGENTI">Agenti</option>
+            <option value="DIREZIONALE">Direzionale</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Canale *</label>
+          <input type="text" name="canale" id="fCanale" required>
+        </div>
+        <div class="form-group">
+          <label>Commodity</label>
+          <select name="commodity" id="fCommodity" onchange="onCommodityChange()">
+            <option value="LUCE">Luce</option>
+            <option value="GAS">Gas</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tipo consumo</label>
+          <select name="tipo_consumo" id="fTipoConsumo" onchange="onTipoChange()">
+            <option value="DOMESTICO">Domestico</option>
+            <option value="ALTRI USI">Altri Usi</option>
+            <option value="CONDOMINI">Condomini</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Spread (<span id="spreadUnit">€/MWh</span>)</label>
+          <input type="number" name="spread" id="fSpread" step="0.001" value="0">
+        </div>
+        <div class="form-group">
+          <label>Quota fissa (€/mese)</label>
+          <input type="number" name="quota_fissa" id="fQF" step="0.01" value="0">
+        </div>
+        <div class="form-group">
+          <label>Consumo medio (<span id="consUnit">MWh</span>) — default auto</label>
+          <input type="number" name="consumo_medio" id="fConsumo" step="0.01" value="2.7">
+        </div>
+        <div class="form-group">
+          <label>Ricorrente €/mese</label>
+          <input type="number" name="ricorrente_mese" id="fRicMese" step="0.01" value="0">
+        </div>
+        <div class="form-group">
+          <label>Ricorrente €/consumo</label>
+          <input type="number" name="ricorrente_consumo" id="fRicCons" step="0.001" value="0">
+        </div>
+        <div class="form-group">
+          <label>Sconto cliente (€/anno)</label>
+          <input type="number" name="sconto" id="fSconto" step="0.01" value="0" min="0"
+                 placeholder="0 = nessuno sconto">
+        </div>
+        <div class="form-group">
+          <label>Stato</label>
+          <select name="stato" id="fStato">
+            <option value="ATTIVA">Attiva</option>
+            <option value="INATTIVA">Inattiva</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+        <button type="submit" class="btn btn-primary">Salva</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CONSUMI = {
+  'DOMESTICO_LUCE': 2.7, 'DOMESTICO_GAS': 800,
+  'ALTRI USI_LUCE': 15,  'ALTRI USI_GAS': 5000,
+  'CONDOMINI_LUCE': 7,   'CONDOMINI_GAS': 20000
+};
+
+function getKey(){ return document.getElementById('fTipoConsumo').value + '_' + document.getElementById('fCommodity').value; }
+
+function updateUnits(){
+  const c = document.getElementById('fCommodity').value;
+  document.getElementById('spreadUnit').textContent = c === 'LUCE' ? '€/MWh' : '€/smc';
+  document.getElementById('consUnit').textContent   = c === 'LUCE' ? 'MWh' : 'smc';
+}
+
+function onCommodityChange(){ updateUnits(); document.getElementById('fConsumo').value = CONSUMI[getKey()] ?? 0; }
+function onTipoChange(){ document.getElementById('fConsumo').value = CONSUMI[getKey()] ?? 0; }
+
+function openModal(o){
+  document.getElementById('modal').classList.add('open');
+  if(o){
+    document.getElementById('modalTitle').textContent = 'Modifica offerta';
+    document.getElementById('fId').value            = o.id;
+    document.getElementById('fNome').value          = o.nome_offerta;
+    document.getElementById('fTipo').value          = o.tipo;
+    document.getElementById('fCanale').value        = o.canale;
+    document.getElementById('fCommodity').value     = o.commodity;
+    document.getElementById('fTipoConsumo').value   = o.tipo_consumo;
+    document.getElementById('fSpread').value        = o.spread;
+    document.getElementById('fQF').value            = o.quota_fissa;
+    document.getElementById('fConsumo').value       = o.consumo_medio;
+    document.getElementById('fRicMese').value       = o.ricorrente_mese;
+    document.getElementById('fRicCons').value       = o.ricorrente_consumo;
+    document.getElementById('fSconto').value        = o.sconto || 0;
+    document.getElementById('fStato').value         = o.stato;
+    updateUnits();
+  } else {
+    document.getElementById('modalTitle').textContent = 'Nuova offerta';
+    document.getElementById('fId').value    = '';
+    document.getElementById('fNome').value  = '';
+    document.getElementById('fCanale').value= '';
+    document.getElementById('fCommodity').value   = 'LUCE';
+    document.getElementById('fTipoConsumo').value = 'DOMESTICO';
+    document.getElementById('fSpread').value      = 0;
+    document.getElementById('fQF').value          = 0;
+    document.getElementById('fRicMese').value     = 0;
+    document.getElementById('fRicCons').value     = 0;
+    document.getElementById('fSconto').value      = 0;
+    document.getElementById('fStato').value       = 'ATTIVA';
+    onCommodityChange();
+  }
+}
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+document.getElementById('modal').addEventListener('click', e => { if(e.target === e.currentTarget) closeModal(); });
+
+// ── Ricerca ────────────────────────────────────────────────────────────────────
+function filterTable(){
+  const q      = document.getElementById('searchInput').value.toLowerCase().trim();
+  const rows   = document.querySelectorAll('#offerteBody tr[data-search]');
+  let visible  = 0;
+  rows.forEach(row => {
+    const match = !q || row.dataset.search.includes(q);
+    row.style.display = match ? '' : 'none';
+    if(match) visible++;
+  });
+  document.getElementById('subtitleCount').textContent = visible + ' offerte' + (q ? ' trovate' : ' totali');
+  document.getElementById('noResults').style.display = visible === 0 ? 'block' : 'none';
+  document.getElementById('offerteTable').style.display = visible === 0 ? 'none' : '';
+}
+</script>
+{% endblock %}
