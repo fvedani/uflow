@@ -33,6 +33,14 @@
   --shadow-lg:0 8px 32px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.4);
   --shadow-accent:0 4px 20px rgba(16,185,129,.25);
   --glow-accent:0 0 0 1px rgba(16,185,129,.3),0 4px 16px rgba(16,185,129,.2);
+  /* ── Design system tokens (--uf-*) ── */
+  --uf-bg:var(--bg);--uf-bg2:var(--bg2);--uf-bg3:var(--bg3);--uf-bg4:var(--bg4);--uf-bg5:var(--bg5);
+  --uf-border:var(--border);--uf-border2:var(--border2);--uf-border3:var(--border3);
+  --uf-text:var(--text);--uf-text2:var(--text2);--uf-text3:var(--text3);--uf-text4:var(--text4);
+  --uf-accent:var(--accent);--uf-accent2:var(--accent2);--uf-accent3:var(--accent3);--uf-accent4:var(--accent4);
+  --uf-radius:var(--radius);--uf-radius-sm:var(--radius-sm);--uf-radius-lg:var(--radius-lg);
+  --uf-shadow:var(--shadow);--uf-shadow-md:var(--shadow-md);--uf-shadow-lg:var(--shadow-lg);
+  --uf-font:var(--font);--uf-mono:var(--mono);
 }
 
 /* ── Base ─────────────────────────────────────────────────────────────────── */
@@ -318,17 +326,32 @@ input::placeholder,textarea::placeholder{color:var(--text4)}
   background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
   padding:18px 20px;transition:border-color .18s,box-shadow .18s,transform .18s;
   position:relative;overflow:hidden;
+  --halo:rgba(16,185,129,.12);
 }
 .stat-card::before{
   content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,rgba(16,185,129,.4),transparent);
+  background:linear-gradient(90deg,transparent,var(--uf-accent2,#34d399),transparent);
   opacity:0;transition:opacity .2s;
+}
+.stat-card::after{
+  content:'';position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(ellipse 80% 60% at 50% -10%,var(--halo) 0%,transparent 70%);
+  opacity:0;transition:opacity .25s;
 }
 .stat-card:hover{
   border-color:var(--border2);box-shadow:var(--shadow-md);
   transform:translateY(-1px);
 }
 .stat-card:hover::before{opacity:1}
+.stat-card:hover::after{opacity:1}
+/* semantic state variants */
+.stat-card.good{--halo:rgba(16,185,129,.15);border-color:rgba(16,185,129,.22)}
+.stat-card.good::before{background:linear-gradient(90deg,transparent,#34d399,transparent);opacity:.7}
+.stat-card.bad {--halo:rgba(239,68,68,.14); border-color:rgba(239,68,68,.22)}
+.stat-card.bad::before {background:linear-gradient(90deg,transparent,#ef4444,transparent);opacity:.7}
+.stat-card.warn{--halo:rgba(245,158,11,.13); border-color:rgba(245,158,11,.22)}
+.stat-card.warn::before{background:linear-gradient(90deg,transparent,#f59e0b,transparent);opacity:.7}
+.stat-card.good:hover,.stat-card.bad:hover,.stat-card.warn:hover{box-shadow:var(--shadow-md)}
 .stat-label{
   font-size:10px;color:var(--text4);font-weight:600;
   text-transform:uppercase;letter-spacing:1.1px;margin-bottom:10px;
@@ -506,10 +529,26 @@ body.theme-light .section-title::after{background:var(--border)}
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="brand-icon" style="background:transparent;box-shadow:none;">
-        <svg viewBox="0 0 60 72" width="27" height="32" style="display:block">
-          <path d="M30,4 C37,6 51,22 51,38 C51,54 41,65 30,66 C24,66 16,61 13,53 C10,45 15,37 21,31 C27,24 26,10 30,4 Z" fill="#34d399"/>
-          <path d="M30,12 C35,15 45,27 44,38 C43,50 36,60 30,61 C26,60 21,56 19,50 C17,44 21,38 27,33 C32,27 30,18 30,12 Z" fill="#059669"/>
-          <path d="M35,19 L23,40 L30,40 L25,54 L39,33 L32,33 Z" fill="#14532d"/>
+        <svg viewBox="0 0 130 110" width="34" height="29" style="display:block">
+          <defs>
+            <linearGradient id="sb-deep" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#022c1c"/>
+              <stop offset="100%" stop-color="#047857"/>
+            </linearGradient>
+            <linearGradient id="sb-mid" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#047857"/>
+              <stop offset="100%" stop-color="#10b981"/>
+            </linearGradient>
+            <linearGradient id="sb-top" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#10b981"/>
+              <stop offset="100%" stop-color="#a7f3d0"/>
+            </linearGradient>
+          </defs>
+          <polygon fill="url(#sb-deep)" points="6,92 78,92 92,72 20,72"/>
+          <polygon fill="url(#sb-mid)"  points="24,64 96,64 110,44 38,44"/>
+          <polygon fill="url(#sb-top)"  points="42,36 114,36 128,16 56,16"/>
+          <circle cx="125" cy="20" r="4" fill="#a7f3d0"/>
+          <circle cx="125" cy="20" r="1.5" fill="#fff"/>
         </svg>
       </div>
       <div>
