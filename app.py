@@ -1,4 +1,4 @@
-import os, io, csv
+import os, io, csv, secrets
 from datetime import datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, flash, abort, session
@@ -24,8 +24,17 @@ try:
 except ImportError:
     pass
 
+try:
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+    _limiter_available = True
+except ImportError:
+    _limiter_available = False
+
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'energia-sim-secret-key-cambia-in-produzione')
+app.secret_key = os.environ.get('SECRET_KEY', '')
+if not app.secret_key:
+    raise RuntimeError('SECRET_KEY non impostata. Aggiungila al file .env')
 
 # ── Filtri Jinja2 per formattazione numeri IT (punto migliaia, virgola decimali) ──
 def _it(value, dec=2):
@@ -47,6 +56,33 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get('ADMIN_EMAILS', 'fvedani23@gmail.com').split(',')}
+REGISTRATION_OPEN = os.environ.get('REGISTRATION_OPEN', 'false').lower() == 'true'
+MIN_PASSWORD_LEN  = 8
+
+# ── Flask-Limiter (opzionale — installare flask-limiter) ────────────────────────
+if _limiter_available:
+    limiter = Limiter(get_remote_address, app=app, default_limits=[],
+                      storage_uri='memory://')
+else:
+    limiter = None
+
+# ── CSRF protection (sessione) ──────────────────────────────────────────────────
+def _csrf_token():
+    if '_csrf' not in session:
+        session['_csrf'] = secrets.token_hex(32)
+    return session['_csrf']
+
+app.jinja_env.globals['csrf_token'] = _csrf_token
+
+@app.before_request
+def _csrf_check():
+    if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+        return
+    if request.is_json:
+        return
+    token = request.form.get('_csrf') or request.headers.get('X-CSRF-Token', '')
+    if not token or not secrets.compare_digest(token, session.get('_csrf', '')):
+        abort(403)
 
 CONSUMI_DEFAULT = {
     ('DOMESTICO', 'LUCE'): 2.7,
@@ -657,8 +693,7 @@ def index():
 def landing():
     return render_template('landing.html')
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
+def _login_view():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     error = None
@@ -668,7 +703,11 @@ def login():
         mode     = request.form.get('mode', 'login')
         with get_db() as db:
             if mode == 'signup':
-                if db.execute('SELECT id FROM utenti WHERE email=?', (email,)).fetchone():
+                if not REGISTRATION_OPEN:
+                    error = 'La registrazione pubblica è disabilitata. Contatta un amministratore.'
+                elif len(password) < MIN_PASSWORD_LEN:
+                    error = f'La password deve essere di almeno {MIN_PASSWORD_LEN} caratteri.'
+                elif db.execute('SELECT id FROM utenti WHERE email=?', (email,)).fetchone():
                     error = 'Email già registrata.'
                 else:
                     is_admin_new = 1 if email in ADMIN_EMAILS else 0
@@ -677,6 +716,7 @@ def login():
                     db.commit()
                     u = db.execute('SELECT * FROM utenti WHERE email=?', (email,)).fetchone()
                     login_user(User(u['id'], u['email'], bool(u['is_admin'])), remember=True)
+                    seed_demo(u['id'])
                     return redirect(url_for('dashboard'))
             else:
                 u = db.execute('SELECT * FROM utenti WHERE email=?', (email,)).fetchone()
@@ -685,7 +725,17 @@ def login():
                     login_user(User(u['id'], u['email'], is_admin), remember=True)
                     return redirect(url_for('dashboard'))
                 error = 'Email o password non corretti.'
-    return render_template('login.html', error=error)
+    return render_template('login.html', error=error, registration_open=REGISTRATION_OPEN)
+
+if limiter:
+    @app.route('/login', methods=['GET', 'POST'])
+    @limiter.limit('10 per minute', methods=['POST'])
+    def login():
+        return _login_view()
+else:
+    @app.route('/login', methods=['GET', 'POST'])
+    def login():
+        return _login_view()
 
 @app.route('/logout')
 @login_required
@@ -823,7 +873,6 @@ def admin_utenti():
 @login_required
 @admin_required
 def admin_toggle_admin(uid):
-    # Non si può rimuovere il proprio admin
     if uid == current_user.id:
         flash('Non puoi modificare il tuo stesso ruolo.', 'warning')
         return redirect(url_for('admin_utenti'))
@@ -834,6 +883,52 @@ def admin_toggle_admin(uid):
             db.execute('UPDATE utenti SET is_admin=? WHERE id=?', (new_val, uid))
             db.commit()
             flash(f'Ruolo aggiornato per {u["email"]}.', 'success')
+    return redirect(url_for('admin_utenti'))
+
+@app.route('/admin/utenti/crea', methods=['POST'])
+@login_required
+@admin_required
+def admin_crea_utente():
+    email    = request.form.get('email', '').strip().lower()
+    password = request.form.get('password', '')
+    is_admin = 1 if request.form.get('is_admin') == '1' else 0
+    if not email or not password:
+        flash('Email e password sono obbligatori.', 'warning')
+        return redirect(url_for('admin_utenti'))
+    if len(password) < MIN_PASSWORD_LEN:
+        flash(f'La password deve essere di almeno {MIN_PASSWORD_LEN} caratteri.', 'warning')
+        return redirect(url_for('admin_utenti'))
+    with get_db() as db:
+        if db.execute('SELECT id FROM utenti WHERE email=?', (email,)).fetchone():
+            flash('Email già registrata.', 'warning')
+            return redirect(url_for('admin_utenti'))
+        cur = db.execute('INSERT INTO utenti(email,password,is_admin) VALUES(?,?,?)',
+                         (email, generate_password_hash(password), is_admin))
+        db.commit()
+        new_id = cur.lastrowid
+    seed_demo(new_id)
+    flash(f'Account creato per {email}.', 'success')
+    return redirect(url_for('admin_utenti'))
+
+@app.route('/admin/utenti/elimina/<int:uid>', methods=['POST'])
+@login_required
+@admin_required
+def admin_elimina_utente(uid):
+    if uid == current_user.id:
+        flash('Non puoi eliminare il tuo account.', 'warning')
+        return redirect(url_for('admin_utenti'))
+    with get_db() as db:
+        u = db.execute('SELECT email FROM utenti WHERE id=?', (uid,)).fetchone()
+        if not u:
+            flash('Utente non trovato.', 'warning')
+            return redirect(url_for('admin_utenti'))
+        email = u['email']
+        for tbl in ('simulazioni', 'clienti_portafoglio', 'portafogli',
+                    'offerte', 'fornitori', 'piani_provvigionali', 'agenti'):
+            db.execute(f'DELETE FROM {tbl} WHERE user_id=?', (uid,))
+        db.execute('DELETE FROM utenti WHERE id=?', (uid,))
+        db.commit()
+    flash(f'Utente {email} eliminato.', 'success')
     return redirect(url_for('admin_utenti'))
 
 @app.route('/admin/reset-demo', methods=['POST'])

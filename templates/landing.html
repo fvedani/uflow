@@ -342,6 +342,99 @@ footer{
   .cta-card{padding:36px 24px}
 }
 
+/* ── Card click hint ── */
+.bc{cursor:pointer}
+.bc-more{
+  display:inline-flex;align-items:center;gap:5px;
+  margin-top:14px;font-size:11px;font-weight:600;color:var(--accent);
+  letter-spacing:.3px;opacity:.8;transition:opacity .2s;
+}
+.bc:hover .bc-more{opacity:1}
+.bc-more-arrow{transition:transform .2s}
+.bc:hover .bc-more-arrow{transform:translateX(3px)}
+
+/* ── Modal overlay ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,.72);backdrop-filter:blur(8px);
+  align-items:center;justify-content:center;padding:24px;
+  opacity:0;transition:opacity .25s;
+}
+.modal-overlay.open{display:flex;opacity:1}
+.modal-box{
+  background:var(--bg2);border:1px solid rgba(16,185,129,.22);
+  border-radius:24px;padding:0;width:100%;max-width:620px;
+  max-height:90vh;overflow:hidden;
+  transform:translateY(24px) scale(.97);transition:transform .28s cubic-bezier(.22,.68,0,1.1);
+  display:flex;flex-direction:column;
+  box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 0 1px rgba(16,185,129,.08);
+}
+.modal-overlay.open .modal-box{transform:translateY(0) scale(1)}
+.modal-head{
+  padding:28px 32px 20px;border-bottom:1px solid rgba(16,185,129,.1);
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
+  flex-shrink:0;
+}
+.modal-head-left{display:flex;align-items:flex-start;gap:16px}
+.modal-title{font-size:20px;font-weight:800;letter-spacing:-.4px;margin-bottom:4px}
+.modal-subtitle{font-size:12px;color:var(--text3)}
+.modal-close{
+  width:32px;height:32px;border-radius:8px;border:1px solid rgba(16,185,129,.15);
+  background:rgba(16,185,129,.06);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--text3);font-size:18px;line-height:1;flex-shrink:0;
+  transition:all .18s;
+}
+.modal-close:hover{background:rgba(16,185,129,.14);color:var(--text);border-color:rgba(16,185,129,.35)}
+.modal-body{padding:24px 32px 32px;overflow-y:auto;flex:1}
+.modal-section{margin-bottom:22px}
+.modal-section:last-child{margin-bottom:0}
+.modal-sec-title{
+  font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:var(--accent);margin-bottom:12px;
+}
+.modal-sec-title::before{content:'';display:inline-block;width:12px;height:2px;background:var(--accent);margin-right:8px;vertical-align:middle}
+.modal-feat-list{display:flex;flex-direction:column;gap:8px}
+.modal-feat{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px 14px;border-radius:10px;
+  background:rgba(16,185,129,.04);border:1px solid rgba(16,185,129,.09);
+}
+.modal-feat-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:5px;flex-shrink:0}
+.modal-feat-text{font-size:13px;color:var(--text2);line-height:1.55}
+.modal-feat-text strong{color:var(--text)}
+.modal-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+.modal-pill{
+  padding:5px 13px;border-radius:99px;
+  background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.14);
+  font-size:11px;font-weight:500;color:var(--accent2);
+}
+.modal-stat-row{
+  display:flex;gap:12px;flex-wrap:wrap;
+}
+.modal-stat{
+  flex:1;min-width:100px;padding:14px 16px;border-radius:12px;
+  background:var(--bg3);border:1px solid rgba(16,185,129,.12);text-align:center;
+}
+.modal-stat-val{font-size:24px;font-weight:800;letter-spacing:-1px;font-family:var(--mono);
+  background:linear-gradient(135deg,#34d399,#10b981);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.modal-stat-lbl{font-size:10px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:.3px}
+.modal-cta{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:11px 24px;border-radius:10px;border:none;cursor:pointer;
+  background:linear-gradient(135deg,#10b981,#059669);
+  color:#fff;font-size:13px;font-weight:700;font-family:var(--font);
+  text-decoration:none;transition:all .2s;margin-top:20px;
+  box-shadow:0 4px 16px rgba(16,185,129,.3);
+}
+.modal-cta:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(16,185,129,.45)}
+@media(max-width:600px){
+  .modal-head,.modal-body{padding:20px}
+  .modal-title{font-size:17px}
+  .modal-stat-row{flex-direction:column}
+}
+
 /* ── FAQ ── */
 .faq-section{padding:96px 0;background:var(--bg2);}
 .faq-section .section-label{text-align:center;font-size:.72rem;font-weight:700;letter-spacing:.15em;color:var(--accent);text-transform:uppercase;margin-bottom:12px;}
@@ -438,7 +531,7 @@ footer{
   <div class="bento">
 
     <!-- CARD 1 — grande — Simulatore -->
-    <div class="bc bc-1 bc-hero">
+    <div class="bc bc-1 bc-hero" onclick="openModal('m-simulatore')" role="button" tabindex="0">
       <div class="bc-icon ic-emerald">
         <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
@@ -448,10 +541,11 @@ footer{
       <div class="bc-title">Simulatore margini</div>
       <div class="bc-desc">Calcola in tempo reale margine spread, quota fissa, provvigioni e margine netto su qualsiasi offerta luce o gas. Analisi di sensitività al variare del consumo cliente.</div>
       <div class="bc-stat"><div class="bc-stat-dot"></div>Calcolo istantaneo · Luce &amp; Gas</div>
+      <div class="bc-more">Scopri di più <span class="bc-more-arrow">→</span></div>
     </div>
 
     <!-- CARD 2 — medio — Portafogli -->
-    <div class="bc bc-2">
+    <div class="bc bc-2" onclick="openModal('m-portafogli')" role="button" tabindex="0">
       <div class="bc-icon ic-teal">
         <svg viewBox="0 0 24 24" fill="none" stroke="#14b8a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -461,10 +555,11 @@ footer{
       <div class="bc-title">Portafogli clienti</div>
       <div class="bc-desc">Aggrega clienti per agente o segmento. Importa da Excel, monitora la salute con semaforo automatico e individua le posizioni in perdita.</div>
       <div class="bc-stat"><div class="bc-stat-dot"></div>Import Excel / CSV</div>
+      <div class="bc-more">Scopri di più <span class="bc-more-arrow">→</span></div>
     </div>
 
     <!-- CARD 3 — piccola — numero highlight -->
-    <div class="bc bc-3" style="display:flex;flex-direction:column;justify-content:space-between">
+    <div class="bc bc-3" style="display:flex;flex-direction:column;justify-content:space-between" onclick="openModal('m-commodity')" role="button" tabindex="0">
       <div>
         <div class="bc-label">Commodity</div>
         <div class="bc-big-num">2</div>
@@ -476,10 +571,11 @@ footer{
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
         </svg>
       </div>
+      <div class="bc-more">Scopri di più <span class="bc-more-arrow">→</span></div>
     </div>
 
     <!-- CARD 4 — piccola — Fornitori -->
-    <div class="bc bc-4" style="display:flex;flex-direction:column;justify-content:space-between">
+    <div class="bc bc-4" style="display:flex;flex-direction:column;justify-content:space-between" onclick="openModal('m-fornitori')" role="button" tabindex="0">
       <div class="bc-icon ic-blue" style="margin-bottom:14px">
         <svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
@@ -490,10 +586,11 @@ footer{
         <div class="bc-title" style="font-size:16px">Gestione fornitori</div>
         <div class="bc-desc" style="font-size:12px">Spread acquisto e costi PdP per ogni fornitore. Media automatica se non specificato.</div>
       </div>
+      <div class="bc-more" style="margin-top:12px">Scopri di più <span class="bc-more-arrow">→</span></div>
     </div>
 
     <!-- CARD 5 — medio — Rete agenti -->
-    <div class="bc bc-5">
+    <div class="bc bc-5" onclick="openModal('m-agenti')" role="button" tabindex="0">
       <div class="bc-icon ic-purple">
         <svg viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/>
@@ -504,10 +601,11 @@ footer{
       <div class="bc-title">Rete agenti</div>
       <div class="bc-desc">Organigramma completo con area manager, agenti e sub-agenti. Monitora target, performance e piani provvigionali a ogni livello della struttura commerciale.</div>
       <div class="bc-stat"><div class="bc-stat-dot"></div>Organigramma dinamico</div>
+      <div class="bc-more">Scopri di più <span class="bc-more-arrow">→</span></div>
     </div>
 
     <!-- CARD 6 — medio — Confronto + Dashboard -->
-    <div class="bc bc-6">
+    <div class="bc bc-6" onclick="openModal('m-dashboard')" role="button" tabindex="0">
       <div style="display:flex;gap:10px;margin-bottom:18px">
         <div class="bc-icon ic-rose" style="margin-bottom:0">
           <svg viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -523,10 +621,289 @@ footer{
       <div class="bc-label">Analisi</div>
       <div class="bc-title">Confronto &amp; Dashboard</div>
       <div class="bc-desc">Compara due scenari affiancati con grafici interattivi. KPI aggregati, storico e report Excel o PDF per le presentazioni.</div>
+      <div class="bc-more">Scopri di più <span class="bc-more-arrow">→</span></div>
     </div>
 
   </div>
 </section>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     MODAL 1 — Simulatore margini
+════════════════════════════════════════════════════════════════════════════════ -->
+<div id="m-simulatore" class="modal-overlay" onclick="overlayClose(event,this)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-head-left">
+        <div class="bc-icon ic-emerald" style="margin-bottom:0;flex-shrink:0">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        </div>
+        <div>
+          <div class="modal-title">Simulatore margini</div>
+          <div class="modal-subtitle">Calcolo istantaneo · Luce &amp; Gas · Analisi sensitività</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal('m-simulatore')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-stat-row">
+          <div class="modal-stat"><div class="modal-stat-val">&lt;100ms</div><div class="modal-stat-lbl">Latenza calcolo</div></div>
+          <div class="modal-stat"><div class="modal-stat-val">7</div><div class="modal-stat-lbl">Scenari sensitività</div></div>
+          <div class="modal-stat"><div class="modal-stat-val">PDF+XLS</div><div class="modal-stat-lbl">Export report</div></div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">Come funziona</div>
+        <div class="modal-feat-list">
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text">Seleziona <strong>offerta</strong>, <strong>fornitore</strong> e <strong>piano provvigionale</strong>. Inserisci il consumo del cliente (o usa il default per segmento).</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text">Il motore calcola: <strong>spread netto</strong> (vendita − acquisto), <strong>quota fissa netta</strong>, <strong>margine lordo</strong>, tutte le provvigioni per livello gerarchico e infine il <strong>margine netto annuo</strong>.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Analisi di sensitività</strong>: la tabella mostra automaticamente il margine al 25%, 50%, 75%, 100%, 125%, 150%, 175% del consumo base, così vedi subito la robustezza dell'offerta.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Break-even</strong>: consumo minimo oltre il quale il margine netto diventa positivo, calcolato in automatico.</div></div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">Output disponibili</div>
+        <div class="modal-pills">
+          <span class="modal-pill">Margine spread annuo</span>
+          <span class="modal-pill">Margine quota fissa</span>
+          <span class="modal-pill">Totale provvigioni</span>
+          <span class="modal-pill">Margine netto €</span>
+          <span class="modal-pill">Margine netto %</span>
+          <span class="modal-pill">Break-even consumo</span>
+          <span class="modal-pill">Export PDF</span>
+          <span class="modal-pill">Export Excel</span>
+          <span class="modal-pill">Storico simulazioni</span>
+        </div>
+      </div>
+      <a href="/login" class="modal-cta">⚡ Apri il simulatore →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     MODAL 2 — Portafogli clienti
+════════════════════════════════════════════════════════════════════════════════ -->
+<div id="m-portafogli" class="modal-overlay" onclick="overlayClose(event,this)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-head-left">
+        <div class="bc-icon ic-teal" style="margin-bottom:0;flex-shrink:0">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#14b8a6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div>
+          <div class="modal-title">Portafogli clienti</div>
+          <div class="modal-subtitle">Monitoraggio · Semaforo salute · Import Excel</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal('m-portafogli')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-sec-title">Cosa puoi fare</div>
+        <div class="modal-feat-list">
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text">Crea <strong>portafogli</strong> per agente, zona geografica o segmento di clientela. Ogni portafoglio raccoglie tutti i clienti con la relativa offerta e il piano provvigionale.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text">Per ogni cliente puoi impostare un <strong>consumo reale</strong> che sovrascrive il default dell'offerta: il margine viene ricalcolato istantaneamente sulla base dei consumi effettivi.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Semaforo automatico</strong>: verde se nessun cliente è in perdita, giallo fino al 25% di posizioni negative, rosso oltre. Identifichi subito le aree critiche del portafoglio.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Import da Excel</strong>: carica una lista clienti con il template fornito e popola il portafoglio in blocco senza inserimento manuale.</div></div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">KPI aggregati del portafoglio</div>
+        <div class="modal-pills">
+          <span class="modal-pill">Margine netto totale</span>
+          <span class="modal-pill">% clienti in perdita</span>
+          <span class="modal-pill">Margine medio per cliente</span>
+          <span class="modal-pill">Semaforo salute</span>
+          <span class="modal-pill">Distribuzione commodity</span>
+        </div>
+      </div>
+      <a href="/login" class="modal-cta">⚡ Gestisci i portafogli →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     MODAL 3 — Luce & Gas
+════════════════════════════════════════════════════════════════════════════════ -->
+<div id="m-commodity" class="modal-overlay" onclick="overlayClose(event,this)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-head-left">
+        <div class="bc-icon ic-orange" style="margin-bottom:0;flex-shrink:0">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div>
+          <div class="modal-title">Luce &amp; Gas</div>
+          <div class="modal-subtitle">Parametri dedicati per ogni commodity e segmento</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal('m-commodity')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-sec-title">Energia elettrica (Luce)</div>
+        <div class="modal-feat-list">
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Spread</strong> in €/kWh — differenza tra prezzo di vendita e acquisto sull'energia.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Quota fissa</strong> in €/POD/mese — componente ricorrente sul punto di prelievo, indipendente dal consumo.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text">Consumi default per segmento: Domestico 2,7 MWh/anno · Business 15 MWh · Industriale 120 MWh · Condomini 7 MWh.</div></div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">Gas naturale</div>
+        <div class="modal-feat-list">
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Spread</strong> in €/Smc — margine sul metro cubo standard consumato.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Quota fissa</strong> in €/PDR/mese — canone fisso sul punto di riconsegna.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text">Consumi default: Domestico 800 Smc/anno · Business 5.000 Smc · Condomini 20.000 Smc.</div></div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">Segmenti supportati</div>
+        <div class="modal-pills">
+          <span class="modal-pill">Domestico</span>
+          <span class="modal-pill">Business / PMI</span>
+          <span class="modal-pill">Industriale</span>
+          <span class="modal-pill">Condomini</span>
+          <span class="modal-pill">Altri usi</span>
+        </div>
+      </div>
+      <a href="/login" class="modal-cta">⚡ Inizia a simulare →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     MODAL 4 — Gestione fornitori
+════════════════════════════════════════════════════════════════════════════════ -->
+<div id="m-fornitori" class="modal-overlay" onclick="overlayClose(event,this)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-head-left">
+        <div class="bc-icon ic-blue" style="margin-bottom:0;flex-shrink:0">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+        </div>
+        <div>
+          <div class="modal-title">Gestione fornitori</div>
+          <div class="modal-subtitle">Spread acquisto · Costi PdP · Media automatica</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal('m-fornitori')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-sec-title">Dati per ogni fornitore</div>
+        <div class="modal-feat-list">
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Spread acquisto</strong>: il costo di approvvigionamento dell'energia che sottraI al prezzo di vendita per calcolare il margine spread netto.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Costo gestione PdP</strong>: fee fissa mensile per punto di fornitura (POD/PDR) applicata dal fornitore, dedotta dalla quota fissa per ottenere la quota fissa netta.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Commodity</strong>: ogni fornitore può essere configurato per Luce, Gas o entrambi con un unico record.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Tipologia pagamento</strong>: Open credit (pagamento a consuntivo) o Anticipo (versamento anticipato), utile per la gestione del cash flow commerciale.</div></div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">Media automatica</div>
+        <div class="modal-feat-list">
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text">Se non selezioni un fornitore specifico nella simulazione, il sistema usa la <strong>media di tutti i fornitori attivi</strong> per quella commodity — così ottieni un benchmark di mercato immediato.</div></div>
+        </div>
+      </div>
+      <a href="/login" class="modal-cta">⚡ Configura i fornitori →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     MODAL 5 — Rete agenti
+════════════════════════════════════════════════════════════════════════════════ -->
+<div id="m-agenti" class="modal-overlay" onclick="overlayClose(event,this)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-head-left">
+        <div class="bc-icon ic-purple" style="margin-bottom:0;flex-shrink:0">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><line x1="12" y1="8" x2="5" y2="16"/><line x1="12" y1="8" x2="19" y2="16"/></svg>
+        </div>
+        <div>
+          <div class="modal-title">Rete agenti</div>
+          <div class="modal-subtitle">Gerarchia · Provvigioni per livello · Target e performance</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal('m-agenti')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-sec-title">Struttura gerarchica</div>
+        <div class="modal-feat-list">
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>3 livelli</strong>: Area Manager → Agente → Sub-Agente. Ogni nodo può avere un piano provvigionale diverso, con gettone fisso e ricorrente sul consumo e sul mese.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Piano provvigionale</strong> personalizzabile per agente: gettone di attivazione (€/contratto), ricorrente mensile (€/PDR·mese), ricorrente consumo (€/kWh o €/Smc).</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Target</strong>: imposta obiettivi di margine annuo e numero di clienti per ogni agente. Il cruscotto mostra subito lo scostamento rispetto agli obiettivi.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Stato agente</strong>: Attivo / Inattivo. Gli agenti inattivi non compaiono nelle simulazioni nuove ma i dati storici rimangono intatti.</div></div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">Dati per ogni agente</div>
+        <div class="modal-pills">
+          <span class="modal-pill">Ruolo</span>
+          <span class="modal-pill">Zona commerciale</span>
+          <span class="modal-pill">Email &amp; telefono</span>
+          <span class="modal-pill">Data attivazione</span>
+          <span class="modal-pill">Piano provvigionale</span>
+          <span class="modal-pill">Target margine annuo</span>
+          <span class="modal-pill">Target clienti</span>
+          <span class="modal-pill">Note</span>
+        </div>
+      </div>
+      <a href="/login" class="modal-cta">⚡ Gestisci la rete →</a>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════════
+     MODAL 6 — Confronto & Dashboard
+════════════════════════════════════════════════════════════════════════════════ -->
+<div id="m-dashboard" class="modal-overlay" onclick="overlayClose(event,this)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-head-left">
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <div class="bc-icon ic-rose" style="margin-bottom:0;width:40px;height:40px">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
+          <div class="bc-icon ic-emerald" style="margin-bottom:0;width:40px;height:40px">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+        </div>
+        <div>
+          <div class="modal-title">Confronto &amp; Dashboard</div>
+          <div class="modal-subtitle">KPI aggregati · Trend · Report PDF/Excel</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal('m-dashboard')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section">
+        <div class="modal-sec-title">Dashboard centrale</div>
+        <div class="modal-feat-list">
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>KPI in tempo reale</strong>: margine netto medio, margine lordo, % netto, numero simulazioni, split Luce / Gas, portafogli con semaforo.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Trend 8 settimane</strong>: grafico a linee del margine netto medio per settimana. Identifica immediatamente periodi di calo o crescita.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Top 3 simulazioni</strong>: le offerte più redditizie del periodo corrente, con margine netto e percentuale.</div></div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">Modulo confronto scenari</div>
+        <div class="modal-feat-list">
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text">Affianca due simulazioni — <strong>Scenario A vs Scenario B</strong> — su offerte, fornitori o piani diversi. Il pannello mostra le differenze assolute e percentuali su ogni voce.</div></div>
+          <div class="modal-feat"><div class="modal-feat-dot"></div><div class="modal-feat-text"><strong>Export</strong>: scarica un report <strong>Excel</strong> con tutti i dati del confronto o un <strong>PDF</strong> pronto per la presentazione al cliente o al management.</div></div>
+        </div>
+      </div>
+      <div class="modal-section">
+        <div class="modal-sec-title">Modalità dati</div>
+        <div class="modal-pills">
+          <span class="modal-pill">Dati reali</span>
+          <span class="modal-pill">Dati demo</span>
+          <span class="modal-pill">Tutti i dati</span>
+        </div>
+      </div>
+      <a href="/login" class="modal-cta">⚡ Apri la dashboard →</a>
+    </div>
+  </div>
+</div>
 
 <!-- ── FLOW ───────────────────────────────────────────────────────────────────── -->
 <section class="flow-section" id="flow">
@@ -725,6 +1102,46 @@ function toggleFaq(btn) {
     btn.nextElementSibling.style.display = 'block';
   }
 }
+
+/* ── Modal ──────────────────────────────────────────────────────────────────── */
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  requestAnimationFrame(() => el.classList.add('open'));
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('open');
+  el.addEventListener('transitionend', function handler() {
+    el.style.display = 'none';
+    document.body.style.overflow = '';
+    el.removeEventListener('transitionend', handler);
+  });
+}
+
+function overlayClose(e, overlay) {
+  if (e.target === overlay) closeModal(overlay.id);
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
+  }
+});
+
+/* Accessibilità: Enter/Space sulle card attiva il modal */
+document.querySelectorAll('.bc[role="button"]').forEach(card => {
+  card.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      card.click();
+    }
+  });
+});
 
 </script>
 </body>
