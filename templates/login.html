@@ -251,7 +251,9 @@ html,body{
     <!-- Tab accedi / registrati -->
     <div class="tabs">
       <button class="tab active" id="tabLogin"  onclick="setMode('login')">Accedi</button>
+      {% if registration_open %}
       <button class="tab"        id="tabSignup" onclick="setMode('signup')">Crea account</button>
+      {% endif %}
     </div>
 
     <!-- Errore -->
@@ -261,6 +263,7 @@ html,body{
 
     <!-- Form -->
     <form method="POST">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
       <input type="hidden" name="mode" id="modeInput" value="login">
       <div class="fields">
         <div class="fg">
