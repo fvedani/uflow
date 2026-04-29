@@ -3025,36 +3025,42 @@ def _agenti_kpi(aw, ap):
 @app.route('/agenti')
 @login_required
 def agenti_view():
-    aw, ap = uid_where()
-    agenti_data = _agenti_kpi(aw, ap)
+    try:
+        aw, ap = uid_where()
+        agenti_data = _agenti_kpi(aw, ap)
 
-    with get_db() as db:
-        piani = db.execute(
-            f'SELECT id, nome_piano FROM piani_provvigionali {aw} ORDER BY nome_piano', ap
-        ).fetchall() if aw else db.execute(
-            'SELECT id, nome_piano FROM piani_provvigionali ORDER BY nome_piano'
-        ).fetchall()
-        portafogli_tutti = db.execute(
-            f'SELECT id, nome, agente_id FROM portafogli {aw} ORDER BY nome', ap
-        ).fetchall() if aw else db.execute(
-            'SELECT id, nome, agente_id FROM portafogli ORDER BY nome'
-        ).fetchall()
+        with get_db() as db:
+            piani = db.execute(
+                f'SELECT id, nome_piano FROM piani_provvigionali {aw} ORDER BY nome_piano', ap
+            ).fetchall() if aw else db.execute(
+                'SELECT id, nome_piano FROM piani_provvigionali ORDER BY nome_piano'
+            ).fetchall()
+            portafogli_tutti = db.execute(
+                f'SELECT id, nome, agente_id FROM portafogli {aw} ORDER BY nome', ap
+            ).fetchall() if aw else db.execute(
+                'SELECT id, nome, agente_id FROM portafogli ORDER BY nome'
+            ).fetchall()
 
-    # KPI globali rete
-    n_agenti   = len(agenti_data)
-    tot_clienti = sum(a['n_clienti'] for a in agenti_data)
-    tot_margine = sum(a['tot_margine'] for a in agenti_data)
-    n_dc        = sum(1 for a in agenti_data if a['ruolo'] == 'DIRETTORE_COMMERCIALE')
-    n_am        = sum(1 for a in agenti_data if a['ruolo'] == 'AREA_MANAGER')
-    n_agt       = sum(1 for a in agenti_data if a['ruolo'] == 'AGENTE')
-    n_sub       = sum(1 for a in agenti_data if a['ruolo'] == 'SUB_AGENTE')
+        # KPI globali rete
+        n_agenti   = len(agenti_data) if agenti_data else 0
+        tot_clienti = sum(a.get('n_clienti', 0) or 0 for a in agenti_data) if agenti_data else 0
+        tot_margine = sum(a.get('tot_margine', 0) or 0 for a in agenti_data) if agenti_data else 0
+        n_dc        = sum(1 for a in agenti_data if a.get('ruolo') == 'DIRETTORE_COMMERCIALE') if agenti_data else 0
+        n_am        = sum(1 for a in agenti_data if a.get('ruolo') == 'AREA_MANAGER') if agenti_data else 0
+        n_agt       = sum(1 for a in agenti_data if a.get('ruolo') == 'AGENTE') if agenti_data else 0
+        n_sub       = sum(1 for a in agenti_data if a.get('ruolo') == 'SUB_AGENTE') if agenti_data else 0
 
-    return render_template('agenti.html',
-        agenti=agenti_data,
-        piani=[dict(p) for p in piani],
-        portafogli_tutti=[dict(p) for p in portafogli_tutti],
-        n_agenti=n_agenti, n_dc=n_dc, n_am=n_am, n_agt=n_agt, n_sub=n_sub,
-        tot_clienti=tot_clienti, tot_margine=tot_margine)
+        return render_template('agenti.html',
+            agenti=agenti_data,
+            piani=[dict(p) for p in piani],
+            portafogli_tutti=[dict(p) for p in portafogli_tutti],
+            n_agenti=n_agenti, n_dc=n_dc, n_am=n_am, n_agt=n_agt, n_sub=n_sub,
+            tot_clienti=tot_clienti, tot_margine=tot_margine)
+    except Exception as e:
+        print(f'ERRORE in /agenti: {str(e)}')
+        import traceback
+        traceback.print_exc()
+        abort(500)
 
 
 @app.route('/agenti/crea', methods=['POST'])
