@@ -2080,7 +2080,8 @@ def portafoglio_template_import():
     ha    = Alignment(horizontal='center', vertical='center')
 
     headers = [('Nome Cliente',22),('Offerta (nome esatto)',28),
-               ('Piano Provvigionale (nome esatto)',30),('Consumo (lascia vuoto = default offerta)',36),('Note',24)]
+               ('Piano Provvigionale (nome esatto)',30),('Consumo (lascia vuoto = default offerta)',36),
+               ('Data Inizio Fornitura (YYYY-MM-DD)',26),('Note',24)]
     for col,(h,w) in enumerate(headers,1):
         c = ws.cell(row=1,column=col,value=h)
         c.font=hfont; c.fill=hfill; c.alignment=ha
@@ -2092,7 +2093,7 @@ def portafoglio_template_import():
     ex_piano   = piani[0]['nome_piano']     if piani   else 'NOME_PIANO'
     ef = PatternFill('solid',fgColor='161b22')
     for i in range(1,6):
-        for col in range(1,6):
+        for col in range(1,7):
             c = ws.cell(row=i+1,column=col,value='' if col!=2 else (ex_offerta if i==1 else ''))
             c.font=Font(color='e6edf3',size=10); c.fill=ef
             c.alignment=Alignment(vertical='center')
@@ -2100,6 +2101,7 @@ def portafoglio_template_import():
         if i==1:
             ws.cell(row=2,column=2,value=ex_offerta)
             ws.cell(row=2,column=3,value=ex_piano)
+            ws.cell(row=2,column=5,value='2025-06-01')
         ws.row_dimensions[i+1].height=16
 
     # Foglio di riferimento con offerte/piani disponibili
