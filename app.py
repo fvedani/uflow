@@ -2877,19 +2877,19 @@ def export_confronto_pdf():
 
     risp_totale = costo_spread_diff + quota_diff
 
-    # Tabella principale
+    # Tabella principale - con testo semplice non in Paragraph per miglior allineamento
     data = [
         [Paragraph('VOCE', header_style), Paragraph('OFFERTA 1', header_style), Paragraph('OFFERTA 2', header_style), Paragraph('DIFFERENZA', header_style)],
         ['Offerta', sa.get('nome_offerta', '—'), sb.get('nome_offerta', '—'), ''],
         ['Consumo Stimato (smc)', f"{consumo:.2f}", f"{consumo:.2f}", ''],
-        ['Spread (€/smc)', f"{sa.get('spread_vendita', 0):.3f}", f"{sb.get('spread_vendita', 0):.3f}", f"{spread_diff:+.3f}"],
+        ['Spread (€/smc)', f"{sa.get('spread_vendita', 0):.3f}", f"{sb.get('spread_vendita', 0):.3f}", f"{spread_diff:.3f}"],
         ['COSTO SPREAD', f"{costo_spread_a:.2f}", f"{costo_spread_b:.2f}", f"{costo_spread_diff:.2f}"],
-        ['Quota Fissa (€/mese)', f"{sa.get('quota_fissa', 0):.2f}", f"{sb.get('quota_fissa', 0):.2f}", f"{sa.get('quota_fissa', 0) - sb.get('quota_fissa', 0):+.2f}"],
+        ['Quota Fissa (€/mese)', f"{sa.get('quota_fissa', 0):.2f}", f"{sb.get('quota_fissa', 0):.2f}", f"{sa.get('quota_fissa', 0) - sb.get('quota_fissa', 0):.2f}"],
         ['COSTO QF', f"{quota_a:.2f}", f"{quota_b:.2f}", f"{quota_diff:.2f}"],
         ['RISPARMIO TOTALE', '', '', f"{risp_totale:.2f}"],
     ]
 
-    table = Table(data, colWidths=[5*cm, 3.5*cm, 3.5*cm, 3.5*cm])
+    table = Table(data, colWidths=[4.8*cm, 3.6*cm, 3.6*cm, 3.5*cm])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), COLOR_GREEN_DARK),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -2899,26 +2899,28 @@ def export_confronto_pdf():
         ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
         ('ALIGN', (0, 1), (0, -1), 'LEFT'),
         ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#888888')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.white]),
     ]))
     story.append(table)
     story.append(Spacer(1, 0.5*cm))
 
-    # Tabella provvigioni
+    # Tabella provvigioni - con tutti i dettagli
     prov_data = [
         [Paragraph('PROVVIGIONI', header_style), Paragraph('VALORE (€/smc)', header_style), Paragraph('TOTALE (€)', header_style)],
-        ['Introducer', f"€{sa.get('prov_agente', 0):.2f}", f"{sa.get('prov_agente', 0) * consumo:.2f}"],
-        ['Gestore', f"€{sa.get('prov_sub_agente', 0):.2f}", f"{sa.get('prov_sub_agente', 0) * consumo:.2f}"],
+        ['Agente', f"{sa.get('prov_agente', 0):.2f}", f"{sa.get('prov_agente', 0) * consumo:.2f}"],
+        ['Sub-Agente', f"{sa.get('prov_sub_agente', 0):.2f}", f"{sa.get('prov_sub_agente', 0) * consumo:.2f}"],
+        ['Area Manager', f"{sa.get('prov_area_manager', 0):.2f}", f"{sa.get('prov_area_manager', 0) * consumo:.2f}"],
         ['TOTALE', '', f"{sa.get('totale_provvigioni', 0):.2f}"],
     ]
 
-    prov_table = Table(prov_data, colWidths=[5*cm, 3.5*cm, 3.5*cm])
+    prov_table = Table(prov_data, colWidths=[4.8*cm, 3.6*cm, 3.6*cm])
     prov_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), COLOR_GREEN_DARK),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -2928,11 +2930,12 @@ def export_confronto_pdf():
         ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
         ('ALIGN', (0, 1), (0, -1), 'LEFT'),
         ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('TOPPADDING', (0, 0), (-1, -1), 8),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#888888')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.white]),
     ]))
     story.append(prov_table)
