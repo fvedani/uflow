@@ -3,7 +3,8 @@
     "allow": [
       "Bash(python -c \"import secrets; print\\(secrets.token_hex\\(32\\)\\)\")",
       "Bash(git add *)",
-      "Bash(git commit -m 'Feat: PUN/PSV prezzi mercato e analisi costo cliente nel confronto *)"
+      "Bash(git commit -m 'Feat: PUN/PSV prezzi mercato e analisi costo cliente nel confronto *)",
+      "Bash(git commit -m 'Fix: Rimuovi sezione Analisi Costo Cliente che causa errore *)"
     ]
   }
 }
