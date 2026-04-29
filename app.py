@@ -2857,44 +2857,44 @@ def export_confronto_pdf():
     try:
         logo_path = os.path.join(os.path.dirname(__file__), 'static/img/logo.png')
         if os.path.exists(logo_path):
-            logo = Image(logo_path, width=2*cm, height=0.8*cm)
+            logo = Image(logo_path, width=2.5*cm, height=1.2*cm)
             logo_table = Table([[logo]], colWidths=[17.5*cm])
-            logo_table.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('TOPPADDING', (0, 0), (-1, -1), 0), ('BOTTOMPADDING', (0, 0), (-1, -1), 0)]))
+            logo_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('TOPPADDING', (0, 0), (-1, -1), 0),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+            ]))
             story.append(logo_table)
-            story.append(Spacer(1, 0.3*cm))
+            story.append(Spacer(1, 0.4*cm))
     except:
         pass
 
-    # Titolo
-    title_style = ParagraphStyle('Title', fontName='Helvetica-Bold', fontSize=12, textColor=COLOR_GREEN, alignment=1, spaceAfter=6)
-    story.append(Paragraph('Scheda Tecnica Confronto', title_style))
     story.append(Spacer(1, 0.2*cm))
 
-    # Tabella con solo i dati tecnici
+    # Tabella con solo i dati tecnici - usando Paragraph per formattazione corretta
+    text_style = ParagraphStyle('normal', fontName='Helvetica', fontSize=8, alignment=0)
+    header_style = ParagraphStyle('header', fontName='Helvetica-Bold', fontSize=8, alignment=1)
+
     data = [
-        ['VOCE', 'SCENARIO A', 'SCENARIO B', 'DIFFERENZA'],
-        ['Offerta', sa.get('nome_offerta', '—'), sb.get('nome_offerta', '—'), ''],
-        ['Fornitore', sa.get('nome_fornitore', '—'), sb.get('nome_fornitore', '—'), ''],
-        ['Piano', sa.get('nome_piano', '—'), sb.get('nome_piano', '—'), ''],
-        ['Spread vendita (€/unità)', f"{sa.get('spread_vendita', 0):.4f}", f"{sb.get('spread_vendita', 0):.4f}", f"{sb.get('spread_vendita', 0) - sa.get('spread_vendita', 0):+.4f}"],
-        ['Spread acquisto (€/unità)', f"{sa.get('spread_acquisto', 0):.4f}", f"{sb.get('spread_acquisto', 0):.4f}", f"{sb.get('spread_acquisto', 0) - sa.get('spread_acquisto', 0):+.4f}"],
-        ['Quota fissa (€/mese)', f"{sa.get('quota_fissa', 0):.2f}", f"{sb.get('quota_fissa', 0):.2f}", f"{sb.get('quota_fissa', 0) - sa.get('quota_fissa', 0):+.2f}"],
-        ['Consumo medio', f"{sa.get('consumo_medio', 0):.2f}", f"{sb.get('consumo_medio', 0):.2f}", f"{sb.get('consumo_medio', 0) - sa.get('consumo_medio', 0):+.2f}"],
+        [Paragraph('VOCE', header_style), Paragraph('SCENARIO A', header_style), Paragraph('SCENARIO B', header_style), Paragraph('DIFFERENZA', header_style)],
+        [Paragraph('Offerta', text_style), Paragraph(str(sa.get('nome_offerta', '—')), text_style), Paragraph(str(sb.get('nome_offerta', '—')), text_style), Paragraph('', text_style)],
+        [Paragraph('Fornitore', text_style), Paragraph(str(sa.get('nome_fornitore', '—')), text_style), Paragraph(str(sb.get('nome_fornitore', '—')), text_style), Paragraph('', text_style)],
+        [Paragraph('Piano', text_style), Paragraph(str(sa.get('nome_piano', '—')), text_style), Paragraph(str(sb.get('nome_piano', '—')), text_style), Paragraph('', text_style)],
+        [Paragraph('Spread vendita (€/unità)', text_style), Paragraph(f"{sa.get('spread_vendita', 0):.4f}", text_style), Paragraph(f"{sb.get('spread_vendita', 0):.4f}", text_style), Paragraph(f"{sb.get('spread_vendita', 0) - sa.get('spread_vendita', 0):+.4f}", text_style)],
+        [Paragraph('Spread acquisto (€/unità)', text_style), Paragraph(f"{sa.get('spread_acquisto', 0):.4f}", text_style), Paragraph(f"{sb.get('spread_acquisto', 0):.4f}", text_style), Paragraph(f"{sb.get('spread_acquisto', 0) - sa.get('spread_acquisto', 0):+.4f}", text_style)],
+        [Paragraph('Quota fissa (€/mese)', text_style), Paragraph(f"{sa.get('quota_fissa', 0):.2f}", text_style), Paragraph(f"{sb.get('quota_fissa', 0):.2f}", text_style), Paragraph(f"{sb.get('quota_fissa', 0) - sa.get('quota_fissa', 0):+.2f}", text_style)],
+        [Paragraph('Consumo medio', text_style), Paragraph(f"{sa.get('consumo_medio', 0):.2f}", text_style), Paragraph(f"{sb.get('consumo_medio', 0):.2f}", text_style), Paragraph(f"{sb.get('consumo_medio', 0) - sa.get('consumo_medio', 0):+.2f}", text_style)],
     ]
 
     table = Table(data, colWidths=[4.5*cm, 3.5*cm, 3.5*cm, 3.5*cm])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), COLOR_GREEN),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
         ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
-        ('FONTSIZE', (0, 1), (-1, -1), 8),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ('LEFTPADDING', (0, 0), (-1, -1), 6),
         ('RIGHTPADDING', (0, 0), (-1, -1), 6),
         ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1fae5')),
