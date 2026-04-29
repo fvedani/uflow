@@ -2829,6 +2829,138 @@ def admin_prezzi_mercato_elimina(pid):
     return redirect(url_for('admin_prezzi_mercato'))
 
 
+@app.route('/export/confronto-pdf')
+@login_required
+def export_confronto_pdf():
+    sid_a = request.args.get('a', type=int)
+    sid_b = request.args.get('b', type=int)
+    if not sid_a or not sid_b:
+        abort(400)
+    anda, andp = uid_and()
+    with get_db() as db:
+        sa = db.execute(f'SELECT * FROM simulazioni WHERE id=? {anda}', [sid_a]+andp).fetchone()
+        sb = db.execute(f'SELECT * FROM simulazioni WHERE id=? {anda}', [sid_b]+andp).fetchone()
+    if not sa or not sb:
+        abort(404)
+    sa, sb = dict(sa), dict(sb)
+
+    # Calcola costi cliente
+    comm_a = sa.get('commodity', 'LUCE')
+    prezzi_a = get_prezzi_ultimi_12_mesi(comm_a)
+    costo_a_mensile, costo_a_annuo, _, _ = calcola_costo_cliente_12m(sa, prezzi_a)
+    costo_b_mensile, costo_b_annuo, _, _ = calcola_costo_cliente_12m(sb, prezzi_a)
+    risparmio = costo_a_annuo - costo_b_annuo
+
+    # Colori UFLOW (tema verde)
+    COLOR_GREEN = colors.HexColor('#10b981')
+    COLOR_GREEN_DARK = colors.HexColor('#059669')
+    COLOR_GREEN_LIGHT = colors.HexColor('#d1fae5')
+    COLOR_TEXT = colors.HexColor('#e8f5ee')
+    COLOR_BG = colors.HexColor('#061a0e')
+    COLOR_RED = colors.HexColor('#ef4444')
+
+    # Crea PDF
+    pdf_file = io.BytesIO()
+    doc = SimpleDocTemplate(pdf_file, pagesize=A4, topMargin=1*cm, bottomMargin=1*cm, leftMargin=1.5*cm, rightMargin=1.5*cm)
+    story = []
+
+    # Header con logo
+    header_style = ParagraphStyle(
+        'HeaderStyle',
+        fontName='Helvetica-Bold',
+        fontSize=16,
+        textColor=COLOR_GREEN_DARK,
+        spaceAfter=6
+    )
+    story.append(Paragraph('UFLOW — Analisi Convenienza Energetica', header_style))
+
+    subtitle_style = ParagraphStyle(
+        'SubtitleStyle',
+        fontName='Helvetica',
+        fontSize=9,
+        textColor=colors.HexColor('#8b949e'),
+        spaceAfter=12
+    )
+    story.append(Paragraph(f'Confronto: {sa.get("nome_offerta", "—")} vs {sb.get("nome_offerta", "—")} | {datetime.now().strftime("%d/%m/%Y")}', subtitle_style))
+
+    # Banner risparmio
+    risparmio_text = f'Risparmio stimato: <b>€{abs(risparmio):.2f}</b>/anno' if risparmio != 0 else 'Costo identico'
+    risparmio_color = COLOR_GREEN if risparmio > 0 else COLOR_RED
+    banner_style = ParagraphStyle(
+        'BannerStyle',
+        fontName='Helvetica-Bold',
+        fontSize=12,
+        textColor=risparmio_color,
+        spaceAfter=12,
+        alignment=1  # center
+    )
+    story.append(Paragraph(risparmio_text, banner_style))
+    story.append(Spacer(1, 0.3*cm))
+
+    # Tabella confronto parametri
+    data = [['Parametro', 'Offerta A', 'Offerta B', 'Differenza']]
+    data.append(['Fornitore', sa.get('nome_fornitore', '—'), sb.get('nome_fornitore', '—'), ''])
+    data.append(['Spread (€/unità)', f'{sa.get("spread_vendita", 0):.4f}', f'{sb.get("spread_vendita", 0):.4f}', f'{(sb.get("spread_vendita", 0) - sa.get("spread_vendita", 0)):.4f}'])
+    data.append(['Quota fissa (€/mese)', f'{sa.get("quota_fissa", 0):.2f}', f'{sb.get("quota_fissa", 0):.2f}', f'{(sb.get("quota_fissa", 0) - sa.get("quota_fissa", 0)):.2f}'])
+    data.append(['Margine lordo', f'€{sa.get("margine_lordo", 0):.2f}', f'€{sb.get("margine_lordo", 0):.2f}', f'€{(sb.get("margine_lordo", 0) - sa.get("margine_lordo", 0)):.2f}'])
+    data.append(['Costo cliente/anno', f'€{costo_a_annuo:.2f}', f'€{costo_b_annuo:.2f}', f'€{risparmio:.2f}'])
+
+    table = Table(data, colWidths=[3.5*cm, 2.5*cm, 2.5*cm, 2.5*cm])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), COLOR_GREEN_DARK),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#1a3d22')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#0d1117'), colors.HexColor('#1a1f2e')]),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#e6edf3')),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 0.5*cm))
+
+    # Tabella mensile
+    story.append(Paragraph('Analisi Mensile (ultimi 12 mesi)', header_style))
+    story.append(Spacer(1, 0.2*cm))
+
+    months_data = [['Mese', f'PUN/PSV (€/MWh)', 'Costo A', 'Costo B', 'Risparmio']]
+    for i in range(len(costo_a_mensile)):
+        ma = costo_a_mensile[i]
+        mb = costo_b_mensile[i] if i < len(costo_b_mensile) else {}
+        risp_m = (ma.get('costo_mensile', 0) or 0) - (mb.get('costo_mensile', 0) or 0)
+        months_data.append([
+            ma.get('label', ''),
+            f'{ma.get("prezzo_mwh", 0):.2f}',
+            f'€{ma.get("costo_mensile", 0):.2f}',
+            f'€{mb.get("costo_mensile", 0):.2f}',
+            f'€{risp_m:.2f}'
+        ])
+
+    months_table = Table(months_data, colWidths=[2*cm, 2.2*cm, 2*cm, 2*cm, 2*cm])
+    months_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), COLOR_GREEN),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 8),
+        ('FONTSIZE', (0, 1), (-1, -1), 7),
+        ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#1a3d22')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#0d1117'), colors.HexColor('#1a1f2e')]),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#e6edf3')),
+    ]))
+    story.append(months_table)
+
+    # Build PDF
+    doc.build(story)
+    pdf_file.seek(0)
+    return send_file(pdf_file, as_attachment=True,
+                     download_name=f'confronto_{sid_a}_vs_{sid_b}.pdf',
+                     mimetype='application/pdf')
+
+
 @app.route('/confronto')
 @login_required
 def confronto():
