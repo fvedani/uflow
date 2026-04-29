@@ -2856,14 +2856,13 @@ def export_confronto_pdf():
 
     # Logo al centro in alto
     try:
-        logo_path = 'static/img/logo-mark.svg'
+        logo_path = os.path.join(os.path.dirname(__file__), 'static/img/logo-mark.svg')
         if os.path.exists(logo_path):
-            logo = Image(logo_path, width=1.2*cm, height=1.2*cm)
-            logo_table = Table([[logo]], colWidths=[11*cm])
-            logo_table.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
-            story.append(logo_table)
-            story.append(Spacer(1, 0.4*cm))
-    except:
+            logo = Image(logo_path, width=1*cm, height=1*cm)
+            logo.hAlign = 'CENTER'
+            story.append(logo)
+            story.append(Spacer(1, 0.5*cm))
+    except Exception as e:
         pass
 
     # Info confronto
