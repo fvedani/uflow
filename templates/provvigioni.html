@@ -1,128 +1,198 @@
 {% extends "base.html" %}
 {% block title %}Provvigioni — UFLOW{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div>
     <h1 class="page-title">Piani provvigionali</h1>
-    <p class="page-subtitle" id="subtitleCount">{{ piani|length }} piani totali</p>
+    <p class="page-subtitle" id="subtitleCount">{{ piani|length }} pian{{ 'o' if piani|length == 1 else 'i' }} totali</p>
   </div>
   <button class="btn btn-primary" onclick="openModal()">+ Nuovo piano</button>
 </div>
 
-<!-- Barra di ricerca -->
+<!-- Ricerca -->
 <div class="search-bar" style="max-width:360px;margin-bottom:16px">
-  <input type="text" id="searchInput" placeholder="Cerca per nome piano..."
-         oninput="filterPiani()">
+  <input type="text" id="searchInput" placeholder="Cerca per nome piano…" oninput="filterPiani()">
 </div>
 
 {% if not piani %}
 <div class="card">
-  <div class="empty"><div class="empty-icon">💰</div>
-  <div class="empty-title">Nessun piano provvigionale</div>
-  <div class="empty-sub">Crea il primo piano con il pulsante in alto</div></div>
+  <div class="empty">
+    <div class="empty-icon">💰</div>
+    <div class="empty-title">Nessun piano provvigionale</div>
+    <div class="empty-sub">Crea il primo piano con il pulsante in alto</div>
+  </div>
 </div>
 {% endif %}
 
 <div id="pianiContainer" style="display:flex;flex-direction:column;gap:12px">
 {% for p in piani %}
 <div class="card piano-card" data-search="{{ p.nome_piano|lower }}">
+
+  <!-- Header piano -->
   <div class="card-header" style="cursor:pointer" onclick="toggle('d{{ loop.index }}','a{{ loop.index }}')">
-    <div style="flex:1"><strong style="font-size:15px">{{ p.nome_piano }}</strong></div>
-    <div class="flex gap-4 flex-wrap" style="margin-right:16px">
-      {% for label, val in [('Gettone Ag.', p.gettone_agente), ('Gettone Sub.', p.gettone_sub_agente), ('Ric./mese Ag.', p.ricorrente_mese_agente), ('Ric./mese AM', p.ricorrente_mese_area_manager)] %}
-      <div style="text-align:right">
-        <div class="text-sm text-muted">{{ label }}</div>
-        <div class="mono" style="font-weight:500">€ {{ val }}</div>
-      </div>
-      {% endfor %}
+    <div style="flex:1">
+      <strong style="font-size:15px">{{ p.nome_piano }}</strong>
+      <span style="margin-left:10px;font-size:11px;color:var(--text3);background:var(--bg3);
+                   padding:2px 9px;border-radius:99px;border:1px solid var(--border)">
+        {{ p.voci|length }} tipo{{ '' if p.voci|length == 1 else 'i' }}
+      </span>
     </div>
     <div class="flex gap-2">
-      <button class="btn btn-secondary btn-sm" onclick='event.stopPropagation();openModal({{ p|tojson }})'>Modifica</button>
+      <button class="btn btn-secondary btn-sm"
+              onclick='event.stopPropagation();editPiano({{ p|tojson }})'>
+        Modifica
+      </button>
       <form method="POST" action="/provvigioni/elimina/{{ p.id }}" style="display:inline"
-            onsubmit="return confirm('Eliminare questo piano?')">
+            onsubmit="return confirm('Eliminare il piano «{{ p.nome_piano }}» e tutte le sue voci?')">
         <button class="btn btn-danger btn-sm" type="submit" onclick="event.stopPropagation()">Elimina</button>
       </form>
     </div>
     <span id="a{{ loop.index }}" style="color:var(--text3);font-size:12px;margin-left:10px">▼</span>
   </div>
-  <div id="d{{ loop.index }}" style="display:none;border-top:1px solid var(--border)">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr">
-      <div style="padding:16px;border-right:1px solid var(--border)">
-        <div class="section-title" style="color:var(--accent2)">Agente</div>
-        {% for label, val in [('Gettone', p.gettone_agente),('Ric. €/mese', p.ricorrente_mese_agente),('Ric. €/consumo', p.ricorrente_consumo_agente)] %}
-        <div class="flex justify-between" style="margin-bottom:8px">
-          <span class="text-muted text-sm">{{ label }}</span>
-          <span class="mono" style="font-size:13px">€ {{ val }}</span>
-        </div>
+
+  <!-- Dettaglio: tabella voci per tipo offerta -->
+  <div id="d{{ loop.index }}" style="display:none;border-top:1px solid var(--border);overflow-x:auto">
+    {% if p.voci %}
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:680px">
+      <thead>
+        <tr style="background:var(--bg3)">
+          <th style="padding:8px 14px;text-align:left;color:var(--text2);
+                     border-bottom:1px solid var(--border);white-space:nowrap">Tipo offerta</th>
+          <th colspan="3" style="padding:8px 6px;text-align:center;color:var(--accent2);
+                     border-bottom:1px solid var(--border);border-left:1px solid var(--border)">Agente</th>
+          <th colspan="3" style="padding:8px 6px;text-align:center;color:var(--purple);
+                     border-bottom:1px solid var(--border);border-left:1px solid var(--border)">Sub-Agente</th>
+          <th colspan="2" style="padding:8px 6px;text-align:center;color:var(--orange);
+                     border-bottom:1px solid var(--border);border-left:1px solid var(--border)">Area Manager</th>
+        </tr>
+        <tr style="background:var(--bg3);font-size:10px;color:var(--text3)">
+          <th style="padding:3px 14px 7px;border-bottom:1px solid var(--border)"></th>
+          {% for lbl in ['Gettone','€/mese','€/cons'] %}
+          <th style="padding:3px 6px 7px;text-align:right;font-weight:400;
+                     border-bottom:1px solid var(--border){% if loop.first %};border-left:1px solid var(--border){% endif %}">{{ lbl }}</th>
+          {% endfor %}
+          {% for lbl in ['Gettone','€/mese','€/cons'] %}
+          <th style="padding:3px 6px 7px;text-align:right;font-weight:400;
+                     border-bottom:1px solid var(--border){% if loop.first %};border-left:1px solid var(--border){% endif %}">{{ lbl }}</th>
+          {% endfor %}
+          {% for lbl in ['€/mese','€/cons'] %}
+          <th style="padding:3px 6px 7px;text-align:right;font-weight:400;
+                     border-bottom:1px solid var(--border){% if loop.first %};border-left:1px solid var(--border){% endif %}">{{ lbl }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in p.voci %}
+        <tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:8px 14px">
+            <span style="font-weight:600;font-size:13px">{{ v.nome_tipo }}</span>
+            <span style="margin-left:6px;font-size:11px;color:var(--text3)">{{ v.commodity }} · {{ v.tipo_consumo }}</span>
+          </td>
+          <td class="mono" style="padding:8px 8px;text-align:right;border-left:1px solid var(--border)">€ {{ '%g' % v.gettone_agente }}</td>
+          <td class="mono" style="padding:8px 8px;text-align:right">€ {{ '%g' % v.ricorrente_mese_agente }}</td>
+          <td class="mono" style="padding:8px 8px;text-align:right">{{ '%g' % v.ricorrente_consumo_agente }}</td>
+          <td class="mono" style="padding:8px 8px;text-align:right;border-left:1px solid var(--border)">€ {{ '%g' % v.gettone_sub_agente }}</td>
+          <td class="mono" style="padding:8px 8px;text-align:right">€ {{ '%g' % v.ricorrente_mese_sub_agente }}</td>
+          <td class="mono" style="padding:8px 8px;text-align:right">{{ '%g' % v.ricorrente_consumo_sub_agente }}</td>
+          <td class="mono" style="padding:8px 8px;text-align:right;border-left:1px solid var(--border)">€ {{ '%g' % v.ricorrente_mese_area_manager }}</td>
+          <td class="mono" style="padding:8px 8px;text-align:right">{{ '%g' % v.ricorrente_consumo_area_manager }}</td>
+        </tr>
         {% endfor %}
-      </div>
-      <div style="padding:16px;border-right:1px solid var(--border)">
-        <div class="section-title" style="color:var(--purple)">Sub-Agente</div>
-        {% for label, val in [('Gettone', p.gettone_sub_agente),('Ric. €/mese', p.ricorrente_mese_sub_agente),('Ric. €/consumo', p.ricorrente_consumo_sub_agente)] %}
-        <div class="flex justify-between" style="margin-bottom:8px">
-          <span class="text-muted text-sm">{{ label }}</span>
-          <span class="mono" style="font-size:13px">€ {{ val }}</span>
-        </div>
-        {% endfor %}
-      </div>
-      <div style="padding:16px">
-        <div class="section-title" style="color:var(--orange)">Area Manager</div>
-        {% for label, val in [('Ric. €/mese', p.ricorrente_mese_area_manager),('Ric. €/consumo', p.ricorrente_consumo_area_manager)] %}
-        <div class="flex justify-between" style="margin-bottom:8px">
-          <span class="text-muted text-sm">{{ label }}</span>
-          <span class="mono" style="font-size:13px">€ {{ val }}</span>
-        </div>
-        {% endfor %}
-      </div>
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:28px;text-align:center;color:var(--text3);font-size:13px">
+      Nessuna voce configurata — clicca <strong>Modifica</strong> per aggiungere le tariffe.
     </div>
+    {% endif %}
   </div>
 </div>
 {% endfor %}
 </div>
+
 <div id="noResults" style="display:none;text-align:center;padding:40px;color:var(--text3);font-size:13px">
-  Nessun piano trovato per la ricerca corrente.
+  Nessun piano trovato.
 </div>
 
-<!-- Modal -->
+<!-- ═══════════════ MODAL ═══════════════ -->
 <div class="modal-overlay" id="modal">
-  <div class="modal">
-    <div class="modal-header">
+  <div class="modal" style="max-width:900px;width:96vw;max-height:90vh;display:flex;flex-direction:column">
+    <div class="modal-header" style="flex-shrink:0">
       <h2 class="modal-title" id="modalTitle">Nuovo piano provvigionale</h2>
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
-    <form method="POST" action="/provvigioni/salva">
+
+    <form method="POST" action="/provvigioni/salva" id="pianoForm"
+          style="display:flex;flex-direction:column;overflow:hidden;flex:1">
       <input type="hidden" name="id" id="fId">
-      <div class="form-grid form-grid-2">
-        <div class="full-width form-group">
+
+      <!-- Nome piano -->
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div class="form-group" style="max-width:340px;margin:0">
           <label>Nome piano *</label>
-          <input type="text" name="nome_piano" id="fNome" required>
+          <input type="text" name="nome_piano" id="fNome" required placeholder="es. AGENTI SOEVIS">
         </div>
-
-        <div class="form-section-title"><span class="sect-agente">Agente</span></div>
-        <div class="form-group"><label>Gettone Agente (€)</label>
-          <input type="number" name="gettone_agente" id="fGA" step="0.01" value="0"></div>
-        <div class="form-group"><label>Ricorrente €/mese Agente</label>
-          <input type="number" name="ricorrente_mese_agente" id="fRMA" step="0.01" value="0"></div>
-        <div class="form-group"><label>Ricorrente €/consumo Agente</label>
-          <input type="number" name="ricorrente_consumo_agente" id="fRCA" step="0.001" value="0"></div>
-
-        <div class="form-section-title"><span class="sect-sub">Sub-Agente</span></div>
-        <div class="form-group"><label>Gettone Sub-Agente (€)</label>
-          <input type="number" name="gettone_sub_agente" id="fGS" step="0.01" value="0"></div>
-        <div class="form-group"><label>Ricorrente €/mese Sub-Agente</label>
-          <input type="number" name="ricorrente_mese_sub_agente" id="fRMS" step="0.01" value="0"></div>
-        <div class="form-group"><label>Ricorrente €/consumo Sub-Agente</label>
-          <input type="number" name="ricorrente_consumo_sub_agente" id="fRCS" step="0.001" value="0"></div>
-
-        <div class="form-section-title"><span class="sect-am">Area Manager</span></div>
-        <div class="form-group"><label>Ricorrente €/mese Area Manager</label>
-          <input type="number" name="ricorrente_mese_area_manager" id="fRMAM" step="0.01" value="0"></div>
-        <div class="form-group"><label>Ricorrente €/consumo Area Manager</label>
-          <input type="number" name="ricorrente_consumo_area_manager" id="fRCAM" step="0.001" value="0"></div>
       </div>
-      <div class="modal-footer">
+
+      <!-- Tabella voci per tipo offerta -->
+      <div style="padding:16px 20px 0;flex-shrink:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:13px;font-weight:600;color:var(--text2)">Provvigioni per tipo offerta</span>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addRiga()">+ Aggiungi tipo</button>
+        </div>
+      </div>
+
+      <!-- Scrollable table -->
+      <div style="overflow:auto;flex:1;padding:0 20px 16px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:860px" id="vociTable">
+          <thead style="position:sticky;top:0;z-index:1">
+            <tr style="background:var(--bg2)">
+              <th style="padding:8px 8px;text-align:left;color:var(--text2);
+                         border-bottom:1px solid var(--border);min-width:120px">Nome tipo</th>
+              <th style="padding:8px 6px;text-align:left;color:var(--text2);
+                         border-bottom:1px solid var(--border);min-width:80px">Commodity</th>
+              <th style="padding:8px 6px;text-align:left;color:var(--text2);
+                         border-bottom:1px solid var(--border);min-width:110px">Tipo consumo</th>
+              <th colspan="3" style="padding:8px 6px;text-align:center;color:var(--accent2);
+                         border-bottom:1px solid var(--border);border-left:1px solid var(--border)">Agente</th>
+              <th colspan="3" style="padding:8px 6px;text-align:center;color:var(--purple);
+                         border-bottom:1px solid var(--border);border-left:1px solid var(--border)">Sub-Agente</th>
+              <th colspan="2" style="padding:8px 6px;text-align:center;color:var(--orange);
+                         border-bottom:1px solid var(--border);border-left:1px solid var(--border)">Area Manager</th>
+              <th style="border-bottom:1px solid var(--border);width:28px"></th>
+            </tr>
+            <tr style="background:var(--bg2);font-size:10px;color:var(--text3)">
+              <th style="padding:3px 8px 7px;border-bottom:1px solid var(--border)"></th>
+              <th style="padding:3px 6px 7px;border-bottom:1px solid var(--border)"></th>
+              <th style="padding:3px 6px 7px;border-bottom:1px solid var(--border)"></th>
+              {% for lbl in ['Gettone €','€/mese','€/cons'] %}
+              <th style="padding:3px 4px 7px;text-align:right;font-weight:400;
+                         border-bottom:1px solid var(--border){% if loop.first %};border-left:1px solid var(--border){% endif %}">{{ lbl }}</th>
+              {% endfor %}
+              {% for lbl in ['Gettone €','€/mese','€/cons'] %}
+              <th style="padding:3px 4px 7px;text-align:right;font-weight:400;
+                         border-bottom:1px solid var(--border){% if loop.first %};border-left:1px solid var(--border){% endif %}">{{ lbl }}</th>
+              {% endfor %}
+              {% for lbl in ['€/mese','€/cons'] %}
+              <th style="padding:3px 4px 7px;text-align:right;font-weight:400;
+                         border-bottom:1px solid var(--border){% if loop.first %};border-left:1px solid var(--border){% endif %}">{{ lbl }}</th>
+              {% endfor %}
+              <th style="border-bottom:1px solid var(--border)"></th>
+            </tr>
+          </thead>
+          <tbody id="vociBody">
+            <!-- Le righe vengono iniettate da JS -->
+          </tbody>
+        </table>
+        <div id="emptyVoci" style="display:none;padding:24px;text-align:center;color:var(--text3);font-size:13px">
+          Nessun tipo aggiunto. Usa il pulsante «+ Aggiungi tipo» per inserire le prime voci.
+        </div>
+      </div>
+
+      <div class="modal-footer" style="flex-shrink:0">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Annulla</button>
-        <button type="submit" class="btn btn-primary">Salva</button>
+        <button type="submit" class="btn btn-primary">Salva piano</button>
       </div>
     </form>
   </div>
@@ -131,43 +201,121 @@
 
 {% block scripts %}
 <script>
-function toggle(detailId, arrowId){
-  const d = document.getElementById(detailId);
-  const a = document.getElementById(arrowId);
+/* ── Costanti ─────────────────────────────────────────────────────────────── */
+const COMMODITY_OPT    = ['LUCE','GAS'];
+const TIPO_CONSUMO_OPT = ['DOMESTICO','ALTRI USI','CONDOMINI','BUSINESS','INDUSTRIALE'];
+
+/* ── Toggle dettaglio ────────────────────────────────────────────────────── */
+function toggle(dId, aId){
+  const d = document.getElementById(dId);
+  const a = document.getElementById(aId);
   const open = d.style.display === 'none';
   d.style.display = open ? 'block' : 'none';
   a.textContent   = open ? '▲' : '▼';
 }
 
-const FIELD_MAP = [
-  ['fGA',   'gettone_agente'],
-  ['fRMA',  'ricorrente_mese_agente'],
-  ['fRCA',  'ricorrente_consumo_agente'],
-  ['fGS',   'gettone_sub_agente'],
-  ['fRMS',  'ricorrente_mese_sub_agente'],
-  ['fRCS',  'ricorrente_consumo_sub_agente'],
-  ['fRMAM', 'ricorrente_mese_area_manager'],
-  ['fRCAM', 'ricorrente_consumo_area_manager'],
-];
+/* ── Gestione righe della tabella nel modal ──────────────────────────────── */
+let rigaIdx = 0;
 
-function openModal(o){
-  document.getElementById('modal').classList.add('open');
-  if(o){
-    document.getElementById('modalTitle').textContent = 'Modifica piano';
-    document.getElementById('fId').value   = o.id;
-    document.getElementById('fNome').value = o.nome_piano;
-    FIELD_MAP.forEach(([id, key]) => document.getElementById(id).value = o[key]);
-  } else {
-    document.getElementById('modalTitle').textContent = 'Nuovo piano provvigionale';
-    document.getElementById('fId').value   = '';
-    document.getElementById('fNome').value = '';
-    FIELD_MAP.forEach(([id]) => document.getElementById(id).value = 0);
-  }
+function makeRiga(idx, v){
+  const sel = (name, opts, val, bsl) =>
+    `<select name="${name}" style="font-size:12px;padding:3px 4px;width:100%${bsl?';border-left:1px solid var(--border)':''}">
+      ${opts.map(o=>`<option value="${o}"${(val||'').toUpperCase()===o?' selected':''}>
+        ${o}</option>`).join('')}
+    </select>`;
+  const num = (name, val, bsl, step) =>
+    `<input type="number" name="${name}" value="${val??0}"
+            step="${step||'0.01'}" min="0"
+            style="width:70px;font-size:12px;padding:3px 5px;text-align:right${bsl?';border-left:1px solid var(--border)':''}">`;
+  const g  = k => v ? (v[k]??0) : 0;
+
+  return `<tr data-idx="${idx}" style="border-bottom:1px solid var(--border)">
+    <td style="padding:5px 6px">
+      <input type="text" name="voce_nome_${idx}" value="${v?.nome_tipo||''}"
+             placeholder="es. DOM EE" required
+             style="width:110px;font-size:12px;padding:3px 5px">
+    </td>
+    <td style="padding:5px 4px">
+      ${sel('voce_commodity_'+idx, COMMODITY_OPT, v?.commodity)}
+    </td>
+    <td style="padding:5px 4px">
+      ${sel('voce_tipo_consumo_'+idx, TIPO_CONSUMO_OPT, v?.tipo_consumo)}
+    </td>
+    <!-- Agente -->
+    <td style="padding:5px 3px">${num('voce_ga_'+idx,   g('gettone_agente'),         true)}</td>
+    <td style="padding:5px 3px">${num('voce_rma_'+idx,  g('ricorrente_mese_agente'))}</td>
+    <td style="padding:5px 3px">${num('voce_rca_'+idx,  g('ricorrente_consumo_agente'), false,'0.0001')}</td>
+    <!-- Sub-Agente -->
+    <td style="padding:5px 3px">${num('voce_gsa_'+idx,  g('gettone_sub_agente'),      true)}</td>
+    <td style="padding:5px 3px">${num('voce_rms_'+idx,  g('ricorrente_mese_sub_agente'))}</td>
+    <td style="padding:5px 3px">${num('voce_rcs_'+idx,  g('ricorrente_consumo_sub_agente'), false,'0.0001')}</td>
+    <!-- Area Manager -->
+    <td style="padding:5px 3px">${num('voce_rmam_'+idx, g('ricorrente_mese_area_manager'), true)}</td>
+    <td style="padding:5px 3px">${num('voce_rcam_'+idx, g('ricorrente_consumo_area_manager'), false,'0.0001')}</td>
+    <!-- Elimina riga -->
+    <td style="padding:5px 4px;text-align:center">
+      <button type="button" onclick="removeRiga(this)"
+              style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:15px;padding:2px 4px"
+              title="Rimuovi">✕</button>
+    </td>
+  </tr>`;
 }
-function closeModal(){ document.getElementById('modal').classList.remove('open'); }
-document.getElementById('modal').addEventListener('click', e => { if(e.target === e.currentTarget) closeModal(); });
 
-// ── Ricerca ────────────────────────────────────────────────────────────────────
+function addRiga(v){
+  const body = document.getElementById('vociBody');
+  body.insertAdjacentHTML('beforeend', makeRiga(rigaIdx++, v));
+  syncEmpty();
+}
+
+function removeRiga(btn){
+  btn.closest('tr').remove();
+  syncEmpty();
+}
+
+function syncEmpty(){
+  const hasRows = document.getElementById('vociBody').children.length > 0;
+  document.getElementById('emptyVoci').style.display = hasRows ? 'none' : 'block';
+}
+
+/* ── Open / Close modal ──────────────────────────────────────────────────── */
+function openModal(){
+  rigaIdx = 0;
+  document.getElementById('modalTitle').textContent = 'Nuovo piano provvigionale';
+  document.getElementById('fId').value   = '';
+  document.getElementById('fNome').value = '';
+  document.getElementById('vociBody').innerHTML = '';
+  // Precarica le 6 combinazioni standard
+  const preset = [
+    {nome_tipo:'DOM EE',    commodity:'LUCE', tipo_consumo:'DOMESTICO'},
+    {nome_tipo:'DOM GAS',   commodity:'GAS',  tipo_consumo:'DOMESTICO'},
+    {nome_tipo:'AU EE',     commodity:'LUCE', tipo_consumo:'ALTRI USI'},
+    {nome_tipo:'AU GAS',    commodity:'GAS',  tipo_consumo:'ALTRI USI'},
+    {nome_tipo:'Condomini EE',  commodity:'LUCE', tipo_consumo:'CONDOMINI'},
+    {nome_tipo:'Condomini GAS', commodity:'GAS',  tipo_consumo:'CONDOMINI'},
+  ];
+  preset.forEach(p => addRiga(p));
+  document.getElementById('modal').classList.add('open');
+}
+
+function editPiano(p){
+  rigaIdx = 0;
+  document.getElementById('modalTitle').textContent = 'Modifica piano';
+  document.getElementById('fId').value   = p.id;
+  document.getElementById('fNome').value = p.nome_piano;
+  document.getElementById('vociBody').innerHTML = '';
+  (p.voci || []).forEach(v => addRiga(v));
+  syncEmpty();
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+}
+document.getElementById('modal').addEventListener('click', e => {
+  if(e.target === e.currentTarget) closeModal();
+});
+
+/* ── Ricerca ─────────────────────────────────────────────────────────────── */
 function filterPiani(){
   const q     = document.getElementById('searchInput').value.toLowerCase().trim();
   const cards = document.querySelectorAll('.piano-card');
@@ -177,7 +325,8 @@ function filterPiani(){
     card.style.display = match ? '' : 'none';
     if(match) visible++;
   });
-  document.getElementById('subtitleCount').textContent = visible + ' piani' + (q ? ' trovati' : ' totali');
+  document.getElementById('subtitleCount').textContent =
+    visible + (visible === 1 ? ' piano' : ' piani') + (q ? ' trovati' : ' totali');
   document.getElementById('noResults').style.display = visible === 0 ? 'block' : 'none';
 }
 </script>

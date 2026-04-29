@@ -261,6 +261,23 @@ def init_db():
             created_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
             FOREIGN KEY(user_id) REFERENCES utenti(id)
         );
+        CREATE TABLE IF NOT EXISTS piano_voci_provvigionali (
+            id SERIAL PRIMARY KEY,
+            piano_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            nome_tipo TEXT NOT NULL,
+            commodity TEXT NOT NULL,
+            tipo_consumo TEXT NOT NULL,
+            gettone_agente REAL DEFAULT 0,
+            gettone_sub_agente REAL DEFAULT 0,
+            ricorrente_mese_agente REAL DEFAULT 0,
+            ricorrente_consumo_agente REAL DEFAULT 0,
+            ricorrente_mese_sub_agente REAL DEFAULT 0,
+            ricorrente_consumo_sub_agente REAL DEFAULT 0,
+            ricorrente_mese_area_manager REAL DEFAULT 0,
+            ricorrente_consumo_area_manager REAL DEFAULT 0,
+            FOREIGN KEY(piano_id) REFERENCES piani_provvigionali(id)
+        );
         CREATE TABLE IF NOT EXISTS portafogli (
             id SERIAL PRIMARY KEY,
             user_id INTEGER NOT NULL,
@@ -681,7 +698,13 @@ def get_fornitore_medio(commodity):
     }
 
 # ── Calcoli ─────────────────────────────────────────────────────────────────────
-def calcola_simulazione(offerta, fornitore, piano, consumo_override=None):
+def load_piano_voci(db, piano_id):
+    """Carica le voci provvigionali per offerta associate a un piano."""
+    return [dict(r) for r in db.execute(
+        'SELECT * FROM piano_voci_provvigionali WHERE piano_id=?', (piano_id,)
+    ).fetchall()]
+
+def calcola_simulazione(offerta, fornitore, piano, consumo_override=None, voci=None):
     consumo      = consumo_override if consumo_override is not None else offerta['consumo_medio']
     spread_netto = offerta['spread'] - fornitore['spread_acquisto']
     margine_spread_annuo = spread_netto * consumo
@@ -689,24 +712,33 @@ def calcola_simulazione(offerta, fornitore, piano, consumo_override=None):
     sconto_annuo         = offerta.get('sconto', 0) or 0
     margine_lordo        = margine_spread_annuo + margine_qf_annuo - sconto_annuo
 
-    provv_agente = (piano['gettone_agente']
-                    + piano['ricorrente_mese_agente'] * 12
-                    + piano['ricorrente_consumo_agente'] * consumo)
-    provv_sub    = (piano['gettone_sub_agente']
-                    + piano['ricorrente_mese_sub_agente'] * 12
-                    + piano['ricorrente_consumo_sub_agente'] * consumo)
-    provv_am     = (piano['ricorrente_mese_area_manager'] * 12
-                    + piano['ricorrente_consumo_area_manager'] * consumo)
+    # Cerca voce per commodity + tipo_consumo (abbinamento automatico per tipo offerta)
+    eff = piano
+    if voci and offerta.get('commodity') and offerta.get('tipo_consumo'):
+        v = next((v for v in voci
+                  if v.get('commodity', '').upper() == offerta['commodity'].upper()
+                  and v.get('tipo_consumo', '').upper() == offerta['tipo_consumo'].upper()), None)
+        if v:
+            eff = v
+
+    provv_agente = (eff['gettone_agente']
+                    + eff['ricorrente_mese_agente'] * 12
+                    + eff['ricorrente_consumo_agente'] * consumo)
+    provv_sub    = (eff['gettone_sub_agente']
+                    + eff['ricorrente_mese_sub_agente'] * 12
+                    + eff['ricorrente_consumo_sub_agente'] * consumo)
+    provv_am     = (eff['ricorrente_mese_area_manager'] * 12
+                    + eff['ricorrente_consumo_area_manager'] * consumo)
     tot_provv    = provv_agente + provv_sub + provv_am
     margine_netto = margine_lordo - tot_provv
     margine_pct   = (margine_netto / margine_lordo * 100) if margine_lordo != 0 else 0
 
-    ric_cons_tot   = (piano['ricorrente_consumo_agente']
-                      + piano['ricorrente_consumo_sub_agente']
-                      + piano['ricorrente_consumo_area_manager'])
-    gettoni_fissi  = (piano['gettone_agente'] + piano['gettone_sub_agente']
-                      + (piano['ricorrente_mese_agente'] + piano['ricorrente_mese_sub_agente']
-                         + piano['ricorrente_mese_area_manager']) * 12)
+    ric_cons_tot   = (eff['ricorrente_consumo_agente']
+                      + eff['ricorrente_consumo_sub_agente']
+                      + eff['ricorrente_consumo_area_manager'])
+    gettoni_fissi  = (eff['gettone_agente'] + eff['gettone_sub_agente']
+                      + (eff['ricorrente_mese_agente'] + eff['ricorrente_mese_sub_agente']
+                         + eff['ricorrente_mese_area_manager']) * 12)
     qf_netta_annua = (offerta['quota_fissa'] - fornitore['costo_gestione_pdp']) * 12
     coeff_consumo  = spread_netto - ric_cons_tot
     if coeff_consumo > 0:
@@ -1051,6 +1083,7 @@ def api_simula():
     with get_db() as db:
         offerta = db.execute(f'SELECT * FROM offerte WHERE id=? {anda}', [data['offerta_id']] + andp).fetchone()
         piano   = db.execute(f'SELECT * FROM piani_provvigionali WHERE id=? {anda}', [data['piano_id']] + andp).fetchone()
+        voci    = load_piano_voci(db, data['piano_id']) if piano else []
     if not all([offerta, piano]):
         return jsonify({'error': 'Dati non trovati'}), 404
     offerta_d   = dict(offerta)
@@ -1058,7 +1091,7 @@ def api_simula():
     if fornitore_d is None:
         return jsonify({'error': 'Nessun fornitore trovato per questa commodity. Inserire almeno un fornitore.'}), 404
     consumo = float(data['consumo_override']) if data.get('consumo_override') else None
-    return jsonify(calcola_simulazione(offerta_d, fornitore_d, dict(piano), consumo))
+    return jsonify(calcola_simulazione(offerta_d, fornitore_d, dict(piano), consumo, voci))
 
 @app.route('/api/sensitivity', methods=['POST'])
 @login_required
@@ -1068,6 +1101,7 @@ def api_sensitivity():
     with get_db() as db:
         offerta = db.execute(f'SELECT * FROM offerte WHERE id=? {anda}', [data['offerta_id']] + andp).fetchone()
         piano   = db.execute(f'SELECT * FROM piani_provvigionali WHERE id=? {anda}', [data['piano_id']] + andp).fetchone()
+        voci    = load_piano_voci(db, data['piano_id']) if piano else []
     if not all([offerta, piano]):
         return jsonify({'error': 'Dati non trovati'}), 404
     offerta_d   = dict(offerta)
@@ -1079,7 +1113,7 @@ def api_sensitivity():
     righe   = []
     for s in [0.25, 0.50, 0.75, 1.0, 1.25, 1.50, 1.75]:
         c = round(base * s, 4)
-        r = calcola_simulazione(offerta_d, fornitore_d, piano_d, c)
+        r = calcola_simulazione(offerta_d, fornitore_d, piano_d, c, voci)
         righe.append({'consumo': c, 'pct_base': int(s * 100),
                       'margine_lordo': r['margine_lordo'],
                       'totale_provvigioni': r['totale_provvigioni'],
@@ -1143,6 +1177,7 @@ def api_salva_simulazione():
     with get_db() as db:
         offerta = db.execute(f'SELECT * FROM offerte WHERE id=? {anda}', [data['offerta_id']] + andp).fetchone()
         piano   = db.execute(f'SELECT * FROM piani_provvigionali WHERE id=? {anda}', [data['piano_id']] + andp).fetchone()
+        voci    = load_piano_voci(db, data['piano_id']) if piano else []
     if not all([offerta, piano]):
         return jsonify({'error': 'Dati non trovati'}), 404
     offerta_d   = dict(offerta)
@@ -1150,7 +1185,7 @@ def api_salva_simulazione():
     if fornitore_d is None:
         return jsonify({'error': 'Nessun fornitore trovato'}), 404
     consumo = float(data['consumo_override']) if data.get('consumo_override') else None
-    r = calcola_simulazione(offerta_d, fornitore_d, dict(piano), consumo)
+    r = calcola_simulazione(offerta_d, fornitore_d, dict(piano), consumo, voci)
     nome_fornitore = fornitore_d.get('nome', 'Media automatica')
     with get_db() as db:
         db.execute('''INSERT INTO simulazioni
@@ -1271,31 +1306,74 @@ def provvigioni():
     aw, ap = uid_where()
     with get_db() as db:
         rows = db.execute(f'SELECT * FROM piani_provvigionali {aw} ORDER BY created_at DESC', ap).fetchall()
-    return render_template('provvigioni.html', piani=[dict(r) for r in rows])
+        piani = []
+        for r in rows:
+            p = dict(r)
+            p['voci'] = load_piano_voci(db, p['id'])
+            piani.append(p)
+    return render_template('provvigioni.html', piani=piani)
 
 @app.route('/provvigioni/salva', methods=['POST'])
 @login_required
 def provvigione_salva():
     f      = request.form
     row_id = f.get('id')
-    vals = [f['nome_piano'],
-            float(f.get('gettone_agente',0)), float(f.get('gettone_sub_agente',0)),
-            float(f.get('ricorrente_mese_agente',0)), float(f.get('ricorrente_consumo_agente',0)),
-            float(f.get('ricorrente_mese_sub_agente',0)), float(f.get('ricorrente_consumo_sub_agente',0)),
-            float(f.get('ricorrente_mese_area_manager',0)), float(f.get('ricorrente_consumo_area_manager',0))]
+    nome_piano = f['nome_piano']
+
+    # Raccoglie gli indici di riga presenti nel form (voce_nome_0, voce_nome_1, …)
+    righe = []
+    idx = 0
+    while f'voce_nome_{idx}' in f:
+        nome_tipo    = f.get(f'voce_nome_{idx}', '').strip()
+        commodity    = f.get(f'voce_commodity_{idx}', '').strip().upper()
+        tipo_consumo = f.get(f'voce_tipo_consumo_{idx}', '').strip().upper()
+        if nome_tipo and commodity and tipo_consumo:
+            righe.append(dict(
+                nome_tipo    = nome_tipo,
+                commodity    = commodity,
+                tipo_consumo = tipo_consumo,
+                ga   = float(f.get(f'voce_ga_{idx}',   0) or 0),
+                gsa  = float(f.get(f'voce_gsa_{idx}',  0) or 0),
+                rma  = float(f.get(f'voce_rma_{idx}',  0) or 0),
+                rca  = float(f.get(f'voce_rca_{idx}',  0) or 0),
+                rms  = float(f.get(f'voce_rms_{idx}',  0) or 0),
+                rcs  = float(f.get(f'voce_rcs_{idx}',  0) or 0),
+                rmam = float(f.get(f'voce_rmam_{idx}', 0) or 0),
+                rcam = float(f.get(f'voce_rcam_{idx}', 0) or 0),
+            ))
+        idx += 1
+
     with get_db() as db:
         if row_id:
-            db.execute('''UPDATE piani_provvigionali SET nome_piano=?,gettone_agente=?,gettone_sub_agente=?,
-                ricorrente_mese_agente=?,ricorrente_consumo_agente=?,ricorrente_mese_sub_agente=?,
-                ricorrente_consumo_sub_agente=?,ricorrente_mese_area_manager=?,ricorrente_consumo_area_manager=?
-                WHERE id=? AND user_id=?''', vals + [row_id, current_user.id])
+            db.execute('UPDATE piani_provvigionali SET nome_piano=? WHERE id=? AND user_id=?',
+                       [nome_piano, row_id, current_user.id])
+            piano_id = int(row_id)
             flash('Piano aggiornato con successo.', 'success')
         else:
-            db.execute('''INSERT INTO piani_provvigionali(user_id,nome_piano,gettone_agente,gettone_sub_agente,
-                ricorrente_mese_agente,ricorrente_consumo_agente,ricorrente_mese_sub_agente,
-                ricorrente_consumo_sub_agente,ricorrente_mese_area_manager,ricorrente_consumo_area_manager)
-                VALUES(?,?,?,?,?,?,?,?,?,?)''', [current_user.id] + vals)
+            cur = db.execute(
+                'INSERT INTO piani_provvigionali(user_id,nome_piano,gettone_agente,gettone_sub_agente,'
+                'ricorrente_mese_agente,ricorrente_consumo_agente,ricorrente_mese_sub_agente,'
+                'ricorrente_consumo_sub_agente,ricorrente_mese_area_manager,ricorrente_consumo_area_manager) '
+                'VALUES(?,?,0,0,0,0,0,0,0,0)', [current_user.id, nome_piano])
+            piano_id = cur.lastrowid
             flash('Piano creato con successo.', 'success')
+
+        # Riscrive tutte le voci (cancella e reinserisce)
+        db.execute('DELETE FROM piano_voci_provvigionali WHERE piano_id=? AND user_id=?',
+                   [piano_id, current_user.id])
+        for r in righe:
+            db.execute(
+                '''INSERT INTO piano_voci_provvigionali
+                   (piano_id,user_id,nome_tipo,commodity,tipo_consumo,
+                    gettone_agente,gettone_sub_agente,
+                    ricorrente_mese_agente,ricorrente_consumo_agente,
+                    ricorrente_mese_sub_agente,ricorrente_consumo_sub_agente,
+                    ricorrente_mese_area_manager,ricorrente_consumo_area_manager)
+                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                [piano_id, current_user.id,
+                 r['nome_tipo'], r['commodity'], r['tipo_consumo'],
+                 r['ga'], r['gsa'], r['rma'], r['rca'],
+                 r['rms'], r['rcs'], r['rmam'], r['rcam']])
         db.commit()
     return redirect(url_for('provvigioni'))
 
@@ -1304,6 +1382,8 @@ def provvigione_salva():
 def provvigione_elimina(row_id):
     anda, andp = uid_and()
     with get_db() as db:
+        db.execute('DELETE FROM piano_voci_provvigionali WHERE piano_id=? AND user_id=?',
+                   [row_id, current_user.id])
         db.execute(f'DELETE FROM piani_provvigionali WHERE id=? {anda}', [row_id] + andp)
         db.commit()
     flash('Piano eliminato.', 'info')
@@ -1731,6 +1811,7 @@ def _calcola_cliente(offerta_id, piano_id, consumo_override):
         ).fetchone()
         if not piano:
             piano = db.execute('SELECT * FROM piani_provvigionali WHERE id=?', (piano_id,)).fetchone()
+        voci = load_piano_voci(db, piano_id) if piano else []
     if not offerta or not piano:
         return None
     offerta_d = dict(offerta)
@@ -1738,7 +1819,7 @@ def _calcola_cliente(offerta_id, piano_id, consumo_override):
     fornitore_d = _get_fornitore_for_api(None, offerta_d)
     if not fornitore_d:
         return None
-    r = calcola_simulazione(offerta_d, fornitore_d, piano_d, consumo_override)
+    r = calcola_simulazione(offerta_d, fornitore_d, piano_d, consumo_override, voci)
     r['nome_offerta']   = offerta_d['nome_offerta']
     r['nome_fornitore'] = fornitore_d.get('nome', 'Media automatica')
     r['nome_piano']     = piano_d['nome_piano']
@@ -2088,6 +2169,8 @@ def portafoglio_import(pf_id):
                      if aw2 else \
                      {p['nome_piano'].lower(): dict(p)
                       for p in db.execute('SELECT * FROM piani_provvigionali').fetchall()}
+        # Precarica voci provvigionali per tutti i piani (abbinamento automatico)
+        voci_db = {pd['id']: load_piano_voci(db, pd['id']) for pd in piani_db.values()}
 
     ok = 0; skipped = 0; errors = []
     for i, row in enumerate(rows, 1):
@@ -2128,7 +2211,8 @@ def portafoglio_import(pf_id):
             skipped += 1
             continue
 
-        r = calcola_simulazione(offerta_d, fornitore_d, piano_d, consumo_ov)
+        voci_p = voci_db.get(piano_d['id'], [])
+        r = calcola_simulazione(offerta_d, fornitore_d, piano_d, consumo_ov, voci_p)
         with get_db() as db:
             db.execute('''INSERT INTO clienti_portafoglio
                 (portafoglio_id,user_id,nome_cliente,offerta_id,piano_id,consumo_override,note,
