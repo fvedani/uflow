@@ -3043,12 +3043,12 @@ def agenti_view():
 
         # KPI globali rete
         n_agenti   = len(agenti_data) if agenti_data else 0
-        tot_clienti = sum(a.get('n_clienti', 0) or 0 for a in agenti_data) if agenti_data else 0
-        tot_margine = sum(a.get('tot_margine', 0) or 0 for a in agenti_data) if agenti_data else 0
-        n_dc        = sum(1 for a in agenti_data if a.get('ruolo') == 'DIRETTORE_COMMERCIALE') if agenti_data else 0
-        n_am        = sum(1 for a in agenti_data if a.get('ruolo') == 'AREA_MANAGER') if agenti_data else 0
-        n_agt       = sum(1 for a in agenti_data if a.get('ruolo') == 'AGENTE') if agenti_data else 0
-        n_sub       = sum(1 for a in agenti_data if a.get('ruolo') == 'SUB_AGENTE') if agenti_data else 0
+        tot_clienti = sum((a.get('n_clienti') or 0) for a in (agenti_data or []))
+        tot_margine = sum((a.get('tot_margine') or 0) for a in (agenti_data or []))
+        n_dc        = sum(1 for a in (agenti_data or []) if a.get('ruolo') == 'DIRETTORE_COMMERCIALE')
+        n_am        = sum(1 for a in (agenti_data or []) if a.get('ruolo') == 'AREA_MANAGER')
+        n_agt       = sum(1 for a in (agenti_data or []) if a.get('ruolo') == 'AGENTE')
+        n_sub       = sum(1 for a in (agenti_data or []) if a.get('ruolo') == 'SUB_AGENTE')
 
         return render_template('agenti.html',
             agenti=agenti_data,
