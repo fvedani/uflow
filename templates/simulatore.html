@@ -844,7 +844,11 @@ async function eliminaStorico(id, btn){
   if(!confirm('Eliminare questa simulazione?')) return;
   btn.disabled = true;
   try {
-    const res = await fetch('/api/storico/elimina/' + id, {method:'DELETE'});
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+    const res = await fetch('/api/storico/elimina/' + id, {
+      method:'DELETE',
+      headers: csrf ? {'X-CSRF-Token': csrf} : {}
+    });
     if(res.ok){
       showToast('Simulazione eliminata.', 'info');
       await aggiornaStorico();
