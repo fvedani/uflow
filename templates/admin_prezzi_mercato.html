@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Prezzi Mercato (PUN/PSV) — UFLOW{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Prezzi di Mercato</h1>
+    <p class="page-subtitle">Gestione storico PUN (elettricità) e PSV (gas) — fonte: GME</p>
+  </div>
+</div>
+
+<div class="form-grid form-grid-2" style="gap:20px;align-items:start">
+
+  <!-- ── Aggiungi prezzo ──────────────────────────────────────────────────── -->
+  <div class="card card-body">
+    <div class="section-title" style="margin-bottom:16px">Aggiungi / Aggiorna Prezzo</div>
+    <form method="POST" action="/admin/prezzi-mercato">
+      <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+      <input type="hidden" name="action" value="add">
+      <div class="form-grid form-grid-2">
+        <div class="form-group">
+          <label>Commodity</label>
+          <select name="commodity" required>
+            <option value="LUCE">LUCE — PUN (€/MWh)</option>
+            <option value="GAS">GAS — PSV (€/MWh)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Anno</label>
+          <input type="number" name="anno" value="{{ anno_corrente }}" min="2020" max="2030" required>
+        </div>
+        <div class="form-group">
+          <label>Mese</label>
+          <select name="mese" required>
+            {% for m in range(1,13) %}
+            <option value="{{ m }}" {{ 'selected' if m == mese_corrente }}>
+              {{ '%02d'|format(m) }} — {{ mesi_it[m] }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Prezzo medio (€/MWh)</label>
+          <input type="number" name="prezzo_mwh" step="0.01" min="0" placeholder="es. 98.50" required>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>Fonte</label>
+          <input type="text" name="fonte" value="GME" placeholder="GME, Manuale…">
+        </div>
+      </div>
+      <div style="margin-top:14px;text-align:right">
+        <button type="submit" class="btn btn-primary">💾 Salva Prezzo</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ── Info ──────────────────────────────────────────────────────────────── -->
+  <div class="card card-body" style="font-size:13px;color:var(--text2)">
+    <div class="section-title" style="margin-bottom:12px">Come vengono usati</div>
+    <p>I prezzi PUN/PSV alimentano la sezione "Analisi Costo Cliente" nel confronto scenari.</p>
+    <p style="margin-top:10px"><strong>Formula:</strong><br>
+    <code style="font-size:12px">costo = (PUN_or_PSV + spread_vendita) × consumo/12 + quota_fissa</code></p>
+  </div>
+</div>
+
+<!-- ── Tabella PUN ────────────────────────────────────────────────────────── -->
+<div class="card card-body" style="margin-top:20px">
+  <div class="section-title" style="margin-bottom:14px;color:#7c9dff">⚡ PUN — Prezzo Unico Nazionale</div>
+  {% if prezzi_luce %}
+  <div class="table-wrap overflow-x">
+    <table>
+      <thead>
+        <tr>
+          <th>Mese</th>
+          <th style="text-align:right">PUN (€/MWh)</th>
+          <th style="text-align:right">Fonte</th>
+          <th style="text-align:right">Aggiornato</th>
+          <th style="text-align:right"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in prezzi_luce %}
+        <tr>
+          <td class="mono">{{ mesi_it[p.mese] }} {{ p.anno }}</td>
+          <td class="mono fw-600" style="text-align:right;color:#7c9dff">{{ '%.2f'|format(p.prezzo_mwh) }}</td>
+          <td style="text-align:right;font-size:12px;color:var(--text3)">{{ p.fonte or '—' }}</td>
+          <td style="text-align:right;font-size:11px;color:var(--text3)">{{ (p.aggiornato_il or '')[:10] }}</td>
+          <td style="text-align:right">
+            <form method="POST" action="/admin/prezzi-mercato/elimina/{{ p.id }}" style="display:inline" onclick="return confirm('Eliminare?')">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-danger btn-xs" style="padding:4px 8px;font-size:11px">✕</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="color:var(--text3);font-size:12px">Nessun prezzo PUN salvato. Aggiungi i prezzi usando il modulo qui sopra.</div>
+  {% endif %}
+</div>
+
+<!-- ── Tabella PSV ────────────────────────────────────────────────────────── -->
+<div class="card card-body" style="margin-top:20px">
+  <div class="section-title" style="margin-bottom:14px;color:#f0883e">🔥 PSV — Punto di Scambio Virtuale</div>
+  {% if prezzi_gas %}
+  <div class="table-wrap overflow-x">
+    <table>
+      <thead>
+        <tr>
+          <th>Mese</th>
+          <th style="text-align:right">PSV (€/MWh)</th>
+          <th style="text-align:right">PSV (€/Smc)</th>
+          <th style="text-align:right">Fonte</th>
+          <th style="text-align:right">Aggiornato</th>
+          <th style="text-align:right"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in prezzi_gas %}
+        <tr>
+          <td class="mono">{{ mesi_it[p.mese] }} {{ p.anno }}</td>
+          <td class="mono fw-600" style="text-align:right;color:#f0883e">{{ '%.2f'|format(p.prezzo_mwh) }}</td>
+          <td class="mono" style="text-align:right;color:var(--text3)">{{ '%.4f'|format(p.prezzo_mwh * 0.01) }}</td>
+          <td style="text-align:right;font-size:12px;color:var(--text3)">{{ p.fonte or '—' }}</td>
+          <td style="text-align:right;font-size:11px;color:var(--text3)">{{ (p.aggiornato_il or '')[:10] }}</td>
+          <td style="text-align:right">
+            <form method="POST" action="/admin/prezzi-mercato/elimina/{{ p.id }}" style="display:inline" onclick="return confirm('Eliminare?')">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-danger btn-xs" style="padding:4px 8px;font-size:11px">✕</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="color:var(--text3);font-size:12px">Nessun prezzo PSV salvato. Aggiungi i prezzi usando il modulo qui sopra.</div>
+  {% endif %}
+</div>
+{% endblock %}

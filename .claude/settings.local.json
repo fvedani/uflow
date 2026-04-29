@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -c \"import secrets; print\\(secrets.token_hex\\(32\\)\\)\")"
+      "Bash(python -c \"import secrets; print\\(secrets.token_hex\\(32\\)\\)\")",
+      "Bash(git add *)",
+      "Bash(git commit -m 'Feat: PUN/PSV prezzi mercato e analisi costo cliente nel confronto *)"
     ]
   }
 }

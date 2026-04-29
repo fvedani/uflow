@@ -341,6 +341,16 @@ def init_db():
             is_demo INTEGER DEFAULT 0,
             created_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
             FOREIGN KEY(user_id) REFERENCES utenti(id)
+        );
+        CREATE TABLE IF NOT EXISTS prezzi_mercato (
+            id SERIAL PRIMARY KEY,
+            commodity TEXT NOT NULL,
+            anno INTEGER NOT NULL,
+            mese INTEGER NOT NULL,
+            prezzo_mwh REAL NOT NULL,
+            fonte TEXT DEFAULT 'GME',
+            aggiornato_il TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
+            UNIQUE(commodity, anno, mese)
         )
         ''')
         for email in ADMIN_EMAILS:
@@ -527,6 +537,54 @@ def clear_demo(user_id):
 
 with app.app_context():
     init_db()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ── PREZZI MERCATO (PUN / PSV) ──────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════════
+
+MESI_IT = ['','Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
+GAS_MWH_TO_SMC = 0.01
+
+def get_prezzi_ultimi_12_mesi(commodity):
+    """Ultimi 12 mesi disponibili, ordinati cronologicamente (più vecchio prima)."""
+    with get_db() as db:
+        rows = db.execute(
+            'SELECT anno,mese,prezzo_mwh,fonte FROM prezzi_mercato '
+            'WHERE commodity=? ORDER BY anno DESC,mese DESC LIMIT 12',
+            (commodity,)
+        ).fetchall()
+    return [dict(r) for r in reversed(rows)] if rows else []
+
+def calcola_costo_cliente_12m(sim, prezzi):
+    """Stima costo annuo cliente usando prezzi PUN/PSV mensili."""
+    if not prezzi:
+        return [], 0, 0, 0
+    commodity     = sim.get('commodity', 'LUCE')
+    spread        = sim.get('spread_vendita', 0) or 0
+    qf            = sim.get('quota_fissa', 0) or 0
+    consumo_annuo = sim.get('consumo_medio', 0) or 0
+    monthly = []
+    for p in prezzi:
+        pmwh = p.get('prezzo_mwh', 0) or 0
+        pu = pmwh * GAS_MWH_TO_SMC if commodity == 'GAS' else pmwh
+        cons_mese   = consumo_annuo / 12
+        c_energia   = (pu + spread) * cons_mese
+        c_mensile   = c_energia + qf
+        monthly.append({
+            'anno': p['anno'], 'mese': p['mese'],
+            'label': f"{MESI_IT[p['mese']]} {p['anno']}",
+            'prezzo_mwh': round(pmwh, 2),
+            'prezzo_unit': round(pu, 4),
+            'costo_energia': round(c_energia, 2),
+            'costo_fisso': round(qf, 2),
+            'costo_mensile': round(c_mensile, 2),
+        })
+    n = len(prezzi) or 1
+    scale = 12 / n
+    tot       = round(sum(m['costo_mensile'] for m in monthly) * scale, 2)
+    tot_en    = round(sum(m['costo_energia'] for m in monthly) * scale, 2)
+    tot_fisso = round(sum(m['costo_fisso']   for m in monthly) * scale, 2)
+    return monthly, tot, tot_en, tot_fisso
 
 # ── Auth ────────────────────────────────────────────────────────────────────────
 class User(UserMixin):
@@ -2712,6 +2770,65 @@ def export_confronto():
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
+@app.route('/admin/prezzi-mercato', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def admin_prezzi_mercato():
+    if request.method == 'POST':
+        action = request.form.get('action', 'add')
+        if action == 'add':
+            commodity = request.form.get('commodity', '').upper()
+            anno  = int(request.form.get('anno', 0) or 0)
+            mese  = int(request.form.get('mese', 0) or 0)
+            prezzo = float(request.form.get('prezzo_mwh', 0) or 0)
+            fonte  = request.form.get('fonte', 'Manuale').strip() or 'Manuale'
+            if commodity in ('LUCE', 'GAS') and 1 <= mese <= 12 and anno >= 2020 and prezzo > 0:
+                with get_db() as db:
+                    db.execute(
+                        'INSERT INTO prezzi_mercato (commodity,anno,mese,prezzo_mwh,fonte,aggiornato_il) '
+                        'VALUES (?,?,?,?,?,to_char(NOW(),\'YYYY-MM-DD HH24:MI:SS\')) '
+                        'ON CONFLICT (commodity,anno,mese) DO UPDATE SET '
+                        'prezzo_mwh=EXCLUDED.prezzo_mwh, fonte=EXCLUDED.fonte, '
+                        'aggiornato_il=EXCLUDED.aggiornato_il',
+                        (commodity, anno, mese, prezzo, fonte)
+                    )
+                    db.commit()
+                flash(f'Prezzo {"PUN" if commodity=="LUCE" else "PSV"} '
+                      f'{MESI_IT[mese]} {anno} aggiornato: {prezzo} €/MWh', 'success')
+            else:
+                flash('Dati non validi.', 'danger')
+        return redirect(url_for('admin_prezzi_mercato'))
+
+    with get_db() as db:
+        prezzi_luce = db.execute(
+            'SELECT * FROM prezzi_mercato WHERE commodity=? ORDER BY anno DESC,mese DESC LIMIT 24',
+            ('LUCE',)
+        ).fetchall()
+        prezzi_gas = db.execute(
+            'SELECT * FROM prezzi_mercato WHERE commodity=? ORDER BY anno DESC,mese DESC LIMIT 24',
+            ('GAS',)
+        ).fetchall()
+
+    now = datetime.now()
+    return render_template('admin_prezzi_mercato.html',
+        prezzi_luce=[dict(r) for r in prezzi_luce],
+        prezzi_gas=[dict(r) for r in prezzi_gas],
+        anno_corrente=now.year,
+        mese_corrente=now.month,
+        mesi_it=MESI_IT)
+
+
+@app.route('/admin/prezzi-mercato/elimina/<int:pid>', methods=['POST'])
+@login_required
+@admin_required
+def admin_prezzi_mercato_elimina(pid):
+    with get_db() as db:
+        db.execute('DELETE FROM prezzi_mercato WHERE id=?', (pid,))
+        db.commit()
+    flash('Prezzo eliminato.', 'success')
+    return redirect(url_for('admin_prezzi_mercato'))
+
+
 @app.route('/confronto')
 @login_required
 def confronto():
@@ -2724,6 +2841,8 @@ def confronto():
     sid_a = request.args.get('a', type=int)
     sid_b = request.args.get('b', type=int)
     sim_a = sim_b = None
+    costo_a_mensile = costo_b_mensile = []
+    costo_a_annuo = costo_b_annuo = 0
     if sid_a and sid_b:
         anda, andp = uid_and()
         with get_db() as db:
@@ -2731,10 +2850,18 @@ def confronto():
             sim_b = db.execute(f'SELECT * FROM simulazioni WHERE id=? {anda}', [sid_b]+andp).fetchone()
         if sim_a: sim_a = dict(sim_a)
         if sim_b: sim_b = dict(sim_b)
+        if sim_a and sim_b:
+            comm_a = sim_a.get('commodity', 'LUCE')
+            prezzi_a = get_prezzi_ultimi_12_mesi(comm_a)
+            costo_a_mensile, costo_a_annuo, _, _ = calcola_costo_cliente_12m(sim_a, prezzi_a)
+            costo_b_mensile, costo_b_annuo, _, _ = calcola_costo_cliente_12m(sim_b, prezzi_a)
     return render_template('confronto.html',
         sims=[dict(s) for s in sims],
         sim_a=sim_a, sim_b=sim_b,
-        sid_a=sid_a, sid_b=sid_b)
+        sid_a=sid_a, sid_b=sid_b,
+        costo_a_mensile=costo_a_mensile, costo_b_mensile=costo_b_mensile,
+        costo_a_annuo=costo_a_annuo,     costo_b_annuo=costo_b_annuo,
+        mesi_it=MESI_IT)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
