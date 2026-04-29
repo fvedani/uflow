@@ -2853,8 +2853,23 @@ def export_confronto_pdf():
     doc = SimpleDocTemplate(pdf_file, pagesize=A4, topMargin=0.8*cm, bottomMargin=1.2*cm, leftMargin=1.2*cm, rightMargin=1.2*cm)
     story = []
 
-    # Titolo con logo
-    story.append(Spacer(1, 0.3*cm))
+    # Logo al centro in alto
+    try:
+        logo_path = os.path.join(os.path.dirname(__file__), 'static/img/uflow-logo.png')
+        if os.path.exists(logo_path):
+            logo = Image(logo_path, width=3*cm, height=1.8*cm)
+            logo_table = Table([[logo]], colWidths=[17.5*cm])
+            logo_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('TOPPADDING', (0, 0), (-1, -1), 0),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
+            ]))
+            story.append(logo_table)
+            story.append(Spacer(1, 0.4*cm))
+    except:
+        pass
+
+    story.append(Spacer(1, 0.2*cm))
 
     # Tabella con solo i dati tecnici - usando Paragraph per formattazione corretta
     text_style = ParagraphStyle('normal', fontName='Helvetica', fontSize=8, alignment=0)
