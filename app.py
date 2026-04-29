@@ -377,6 +377,19 @@ def init_db():
             db.execute('UPDATE utenti SET is_admin=1 WHERE lower(email)=?', (email,))
         db.commit()
 
+        # ── Migrazioni colonne (idempotenti) ────────────────────────────────
+        migrations = [
+            "ALTER TABLE clienti_portafoglio ADD COLUMN IF NOT EXISTS tipo_consumo TEXT",
+            "ALTER TABLE clienti_portafoglio ADD COLUMN IF NOT EXISTS data_inizio_fornitura TEXT",
+            "ALTER TABLE clienti_portafoglio ADD COLUMN IF NOT EXISTS data_switch_out TEXT",
+        ]
+        for sql in migrations:
+            try:
+                db.execute(sql)
+            except Exception:
+                pass
+        db.commit()
+
 def seed_demo(admin_user_id):
     """
     Inserisce dati demo realistici per il mercato energia italiano.
