@@ -2993,13 +2993,13 @@ def _agenti_kpi(aw, ap):
         rows = db.execute(f'''
             SELECT a.*,
                 pp.nome_piano,
-                (par.nome || ' ' || par.cognome) AS nome_superiore,
+                COALESCE(par.nome || ' ' || par.cognome, '') AS nome_superiore,
                 par.ruolo AS ruolo_superiore,
                 COUNT(DISTINCT pf.id)  AS n_portafogli,
                 COUNT(DISTINCT cp.id)  AS n_clienti,
                 COALESCE(SUM(cp.margine_netto), 0)  AS tot_margine,
                 COALESCE(SUM(cp.margine_lordo), 0)  AS tot_lordo,
-                SUM(CASE WHEN cp.margine_netto < 0 THEN 1 ELSE 0 END) AS n_negativi
+                COALESCE(SUM(CASE WHEN cp.margine_netto < 0 THEN 1 ELSE 0 END), 0) AS n_negativi
             FROM agenti a
             LEFT JOIN piani_provvigionali pp ON pp.id = a.piano_id
             LEFT JOIN agenti par ON par.id = a.parent_id
