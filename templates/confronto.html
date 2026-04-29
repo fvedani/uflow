@@ -79,6 +79,71 @@
   </div>
 </div>
 
+<!-- Analisi Costo Cliente -->
+{% if costo_a_annuo > 0 or costo_b_annuo > 0 %}
+{% set risparmio = costo_a_annuo - costo_b_annuo %}
+<div class="card card-body" style="margin-bottom:20px;background:{% if risparmio > 0 %}rgba(63,185,80,.08){% elif risparmio < 0 %}rgba(248,81,73,.08){% else %}var(--bg3){% endif %};border-color:{% if risparmio > 0 %}rgba(63,185,80,.3){% elif risparmio < 0 %}rgba(248,81,73,.3){% else %}var(--border){% endif %}">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:4px">📊 Risparmio cliente annuo (basato su ultimi 12 mesi PUN/PSV)</div>
+      <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:{% if risparmio > 0 %}var(--green){% elif risparmio < 0 %}var(--red){% else %}var(--text2){% endif %}">
+        {% if risparmio > 0 %}+{% endif %}€{{ risparmio|n2 }}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="text-align:center;padding:10px 14px;background:rgba(124,157,255,.08);border-radius:6px;border:1px solid rgba(124,157,255,.2)">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Costo A/anno</div>
+        <div class="mono fw-600" style="font-size:14px;color:#7c9dff">€{{ costo_a_annuo|n2 }}</div>
+      </div>
+      <div style="text-align:center;padding:10px 14px;background:rgba(188,140,255,.08);border-radius:6px;border:1px solid rgba(188,140,255,.2)">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px">Costo B/anno</div>
+        <div class="mono fw-600" style="font-size:14px;color:#bc8cff">€{{ costo_b_annuo|n2 }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if costo_a_mensile %}
+<div class="card card-body" style="margin-bottom:20px">
+  <div class="section-title" style="margin-bottom:12px">Breakdown mensile (ultimi 12 mesi)</div>
+  <div class="table-wrap overflow-x">
+    <table>
+      <thead>
+        <tr>
+          <th>Mese</th>
+          <th style="text-align:right;color:#e3b341">PUN/PSV</th>
+          <th style="text-align:right;color:#7c9dff">Costo A</th>
+          <th style="text-align:right;color:#bc8cff">Costo B</th>
+          <th style="text-align:right">Risparmio</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in range(costo_a_mensile|length) %}
+        {% set ma = costo_a_mensile[i] %}
+        {% set mb = costo_b_mensile[i] if i < costo_b_mensile|length else {} %}
+        {% set risp_m = (ma.costo_mensile or 0) - (mb.costo_mensile or 0) %}
+        <tr>
+          <td class="mono" style="font-size:12px">{{ ma.label }}</td>
+          <td class="mono" style="text-align:right;color:#e3b341;font-size:12px">{{ ma.prezzo_mwh|n2 }}</td>
+          <td class="mono" style="text-align:right;color:#7c9dff;font-size:12px">€{{ ma.costo_mensile|n2 }}</td>
+          <td class="mono" style="text-align:right;color:#bc8cff;font-size:12px">€{{ (mb.costo_mensile or 0)|n2 }}</td>
+          <td class="mono fw-600" style="text-align:right;font-size:12px;color:{% if risp_m > 0 %}var(--green){% elif risp_m < 0 %}var(--red){% else %}var(--text3){% endif %}">
+            {% if risp_m > 0 %}+{% endif %}€{{ risp_m|n2 }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% else %}
+<div class="alert alert-info" style="margin-bottom:20px">
+  <strong>Analisi Costo Cliente:</strong> Nessun dato PUN/PSV disponibile.
+  <a href="/admin/prezzi-mercato" style="color:inherit;text-decoration:underline">Aggiungi i prezzi di mercato →</a>
+</div>
+{% endif %}
+
 <!-- KPI differenze -->
 <div class="stat-grid stat-grid-4" style="margin-bottom:20px">
   {% macro diff_card(label, val_a, val_b, diff, fmt='€') %}
