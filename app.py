@@ -2854,17 +2854,6 @@ def export_confronto_pdf():
     doc = SimpleDocTemplate(pdf_file, pagesize=A4, topMargin=0.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
     story = []
 
-    # Logo al centro in alto
-    try:
-        logo_path = os.path.join(os.path.dirname(__file__), 'static/img/logo-mark.svg')
-        if os.path.exists(logo_path):
-            logo = Image(logo_path, width=1*cm, height=1*cm)
-            logo.hAlign = 'CENTER'
-            story.append(logo)
-            story.append(Spacer(1, 0.5*cm))
-    except Exception as e:
-        pass
-
     # Info confronto
     title_style = ParagraphStyle(
         'TitleStyle',
