@@ -301,6 +301,7 @@ def init_db():
             nome_fornitore TEXT,
             nome_piano TEXT,
             commodity TEXT,
+            tipo_consumo TEXT,
             spread_vendita REAL,
             spread_acquisto REAL,
             quota_fissa REAL,
@@ -309,6 +310,8 @@ def init_db():
             totale_provvigioni REAL,
             margine_netto REAL,
             margine_percentuale REAL,
+            data_inizio_fornitura TEXT,
+            data_switch_out TEXT,
             created_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
             FOREIGN KEY(portafoglio_id) REFERENCES portafogli(id),
             FOREIGN KEY(user_id) REFERENCES utenti(id)
@@ -517,13 +520,13 @@ def seed_demo(admin_user_id):
             r = calcola_simulazione(off_d, for_d, dict(piano_row), consumo)
             db.execute('''INSERT INTO clienti_portafoglio
                 (portafoglio_id,user_id,nome_cliente,offerta_id,piano_id,consumo_override,
-                 nome_offerta,nome_fornitore,nome_piano,commodity,
+                 nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
                  spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
                  margine_lordo,totale_provvigioni,margine_netto,margine_percentuale)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                 (pf_id,admin_user_id,nome_cl,oid,pid,consumo,
                  off_d['nome_offerta'],for_d.get('nome','Media'),off_d['nome_offerta'][:10],
-                 off_d['commodity'],r['spread_vendita'],r['spread_acquisto'],
+                 off_d['commodity'],off_d.get('tipo_consumo',''),r['spread_vendita'],r['spread_acquisto'],
                  r['quota_fissa'],r['costo_gestione_pdp'],
                  r['margine_lordo'],r['totale_provvigioni'],r['margine_netto'],r['margine_percentuale']))
         db.commit()
@@ -1824,6 +1827,7 @@ def _calcola_cliente(offerta_id, piano_id, consumo_override):
     r['nome_fornitore'] = fornitore_d.get('nome', 'Media automatica')
     r['nome_piano']     = piano_d['nome_piano']
     r['commodity']      = offerta_d['commodity']
+    r['tipo_consumo']   = offerta_d.get('tipo_consumo', '')
     return r
 
 
@@ -1938,6 +1942,7 @@ def portafoglio_aggiungi_cliente(pf_id):
     consumo_ov  = float(f['consumo']) if f.get('consumo') else None
     nome_cliente = f.get('nome_cliente', '').strip() or f'Cliente {datetime.now().strftime("%d/%m %H:%M")}'
     note        = f.get('note', '').strip()
+    data_inizio = f.get('data_inizio_fornitura', '').strip() or None
 
     r = _calcola_cliente(offerta_id, piano_id, consumo_ov)
     if not r:
@@ -1947,15 +1952,17 @@ def portafoglio_aggiungi_cliente(pf_id):
     with get_db() as db:
         db.execute('''INSERT INTO clienti_portafoglio
             (portafoglio_id,user_id,nome_cliente,offerta_id,piano_id,consumo_override,note,
-             nome_offerta,nome_fornitore,nome_piano,commodity,
+             nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
              spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
-             margine_lordo,totale_provvigioni,margine_netto,margine_percentuale)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+             margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
             (pf_id, current_user.id, nome_cliente, offerta_id, piano_id,
              consumo_ov or r['consumo_medio'], note,
              r['nome_offerta'], r['nome_fornitore'], r['nome_piano'], r['commodity'],
+             r.get('tipo_consumo', ''),
              r['spread_vendita'], r['spread_acquisto'], r['quota_fissa'], r['costo_gestione_pdp'],
-             r['margine_lordo'], r['totale_provvigioni'], r['margine_netto'], r['margine_percentuale']))
+             r['margine_lordo'], r['totale_provvigioni'], r['margine_netto'], r['margine_percentuale'],
+             data_inizio))
         db.commit()
     flash(f'Cliente "{nome_cliente}" aggiunto al portafoglio.', 'success')
     return redirect(url_for('portafoglio_dettaglio', pf_id=pf_id))
@@ -1984,19 +1991,22 @@ def portafoglio_aggiorna_cliente(pf_id, cid):
             abort(404)
     consumo_str = request.form.get('consumo', '').strip()
     note = request.form.get('note', c['note'] or '')
+    data_inizio = request.form.get('data_inizio_fornitura', '').strip() or c.get('data_inizio_fornitura')
+    data_switch_out = request.form.get('data_switch_out', '').strip() or c.get('data_switch_out')
     consumo_ov = float(consumo_str) if consumo_str else c['consumo_override']
     # Ricalcola margini con nuovo consumo
     r = _calcola_cliente(c['offerta_id'], c['piano_id'], consumo_ov)
     if r:
         with get_db() as db:
             db.execute('''UPDATE clienti_portafoglio SET
-                consumo_override=?, note=?,
-                nome_offerta=?,nome_fornitore=?,nome_piano=?,commodity=?,
+                consumo_override=?, note=?, data_inizio_fornitura=?, data_switch_out=?,
+                nome_offerta=?,nome_fornitore=?,nome_piano=?,commodity=?,tipo_consumo=?,
                 spread_vendita=?,spread_acquisto=?,quota_fissa=?,costo_gestione_pdp=?,
                 margine_lordo=?,totale_provvigioni=?,margine_netto=?,margine_percentuale=?
                 WHERE id=? AND portafoglio_id=?''',
-                (consumo_ov, note,
+                (consumo_ov, note, data_inizio, data_switch_out,
                  r['nome_offerta'],r['nome_fornitore'],r['nome_piano'],r['commodity'],
+                 r.get('tipo_consumo',''),
                  r['spread_vendita'],r['spread_acquisto'],r['quota_fissa'],r['costo_gestione_pdp'],
                  r['margine_lordo'],r['totale_provvigioni'],r['margine_netto'],r['margine_percentuale'],
                  cid, pf_id))
@@ -2004,8 +2014,8 @@ def portafoglio_aggiorna_cliente(pf_id, cid):
         flash('Cliente aggiornato e margini ricalcolati.', 'success')
     else:
         with get_db() as db:
-            db.execute('UPDATE clienti_portafoglio SET consumo_override=?, note=? WHERE id=? AND portafoglio_id=?',
-                       (consumo_ov, note, cid, pf_id))
+            db.execute('UPDATE clienti_portafoglio SET consumo_override=?, note=?, data_inizio_fornitura=?, data_switch_out=? WHERE id=? AND portafoglio_id=?',
+                       (consumo_ov, note, data_inizio, data_switch_out, cid, pf_id))
             db.commit()
         flash('Consumo aggiornato (offerta o piano non disponibili per il ricalcolo).', 'warning')
     return redirect(url_for('portafoglio_dettaglio', pf_id=pf_id))
@@ -2109,6 +2119,33 @@ def portafoglio_template_import():
                      mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 
+# ── Flusso cassa portafoglio ───────────────────────────────────────────────────
+@app.route('/portafogli/<int:pf_id>/flusso')
+@login_required
+def portafoglio_flusso(pf_id):
+    anda, andp = uid_and()
+    with get_db() as db:
+        pf = db.execute(f'SELECT * FROM portafogli WHERE id=? {anda}', [pf_id]+andp).fetchone()
+        if not pf:
+            abort(404)
+        clienti = db.execute(
+            'SELECT * FROM clienti_portafoglio WHERE portafoglio_id=? ORDER BY nome_cliente',
+            (pf_id,)
+        ).fetchall()
+
+    pf_d = dict(pf)
+    clienti_d = [dict(c) for c in clienti]
+
+    # Check for missing data_inizio_fornitura
+    missing_dates = [c for c in clienti_d if not c.get('data_inizio_fornitura')]
+
+    return render_template('flusso_cassa.html',
+                         pf=pf_d,
+                         clienti=clienti_d,
+                         missing_dates=missing_dates,
+                         view='flusso')
+
+
 # ── Import clienti da file ────────────────────────────────────────────────────
 @app.route('/portafogli/<int:pf_id>/import', methods=['POST'])
 @login_required
@@ -2179,6 +2216,7 @@ def portafoglio_import(pf_id):
         nome_piano   = _col(row,'piano')
         consumo_str  = _col(row,'consumo')
         note         = _col(row,'note','notes')
+        data_inizio_str = _col(row,'data inizio','fornitura','inizio fornitura')
 
         offerta_d = offerte_db.get(nome_offerta.lower())
         piano_d   = piani_db.get(nome_piano.lower())
@@ -2194,6 +2232,25 @@ def portafoglio_import(pf_id):
             consumo_ov = float(consumo_str) if consumo_str else None
         except ValueError:
             consumo_ov = None
+
+        # Parse data_inizio_fornitura: handle datetime objects from Excel and string dates
+        data_inizio = None
+        if data_inizio_str:
+            try:
+                # If it's a datetime string from Excel (e.g. "2025-06-01 00:00:00"), extract date part
+                if isinstance(data_inizio_str, str):
+                    # Try YYYY-MM-DD format first
+                    if ' ' in data_inizio_str:
+                        data_inizio = data_inizio_str.split(' ')[0]
+                    else:
+                        data_inizio = data_inizio_str
+                    # Validate it's a valid date format
+                    from datetime import datetime as dt
+                    dt.strptime(data_inizio, '%Y-%m-%d')
+                else:
+                    data_inizio = None
+            except:
+                data_inizio = None
 
         fornitore_d = _get_fornitore_for_api(None, offerta_d)
         if not fornitore_d:
@@ -2216,17 +2273,18 @@ def portafoglio_import(pf_id):
         with get_db() as db:
             db.execute('''INSERT INTO clienti_portafoglio
                 (portafoglio_id,user_id,nome_cliente,offerta_id,piano_id,consumo_override,note,
-                 nome_offerta,nome_fornitore,nome_piano,commodity,
+                 nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
                  spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
-                 margine_lordo,totale_provvigioni,margine_netto,margine_percentuale)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                 margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                 (pf_id, current_user.id, nome_cliente,
                  offerta_d['id'], piano_d['id'],
                  consumo_ov or r['consumo_medio'], note,
                  offerta_d['nome_offerta'], fornitore_d.get('nome','Media automatica'),
-                 piano_d['nome_piano'], offerta_d['commodity'],
+                 piano_d['nome_piano'], offerta_d['commodity'], offerta_d.get('tipo_consumo',''),
                  r['spread_vendita'], r['spread_acquisto'], r['quota_fissa'], r['costo_gestione_pdp'],
-                 r['margine_lordo'], r['totale_provvigioni'], r['margine_netto'], r['margine_percentuale']))
+                 r['margine_lordo'], r['totale_provvigioni'], r['margine_netto'], r['margine_percentuale'],
+                 data_inizio))
             db.commit()
         ok += 1
 

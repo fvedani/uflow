@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Flusso cassa — {{ pf.nome }} — UFLOW{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <a href="/portafogli/{{ pf.id }}" class="btn btn-secondary btn-sm">← {{ pf.nome }}</a>
+    <div>
+      <h1 class="page-title">Flusso cassa — {{ pf.nome }}</h1>
+      <p class="page-subtitle">Proiezione mensile delle provvigioni e cash flow del portafoglio</p>
+    </div>
+  </div>
+  <div class="flex gap-2">
+    <select id="mesiSelector" onchange="updateChart()" class="btn btn-secondary" style="width:auto">
+      <option value="12">12 mesi</option>
+      <option value="24">24 mesi</option>
+      <option value="36">36 mesi</option>
+      <option value="48">48 mesi</option>
+      <option value="60">60 mesi</option>
+    </select>
+  </div>
+</div>
+
+{% if missing_dates %}
+<div class="alert alert-warning" style="margin-bottom:14px">
+  <strong>Attenzione:</strong> {{ missing_dates|length }} cliente(i) non hanno una data di inizio fornitura. Il flusso cassa potrebbe non essere accurato. Inserisci le date mancanti nel portafoglio.
+</div>
+{% endif %}
+
+<!-- KPI Cards -->
+<div class="stat-grid stat-grid-4" style="margin-bottom:16px">
+  <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.45)">
+    <div class="stat-label">Clienti con flusso</div>
+    <div class="stat-value color-accent">{{ (clienti|selectattr('data_inizio_fornitura')|list)|length }}</div>
+  </div>
+  <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.3)">
+    <div class="stat-label">Mesi proiettati</div>
+    <div class="stat-value color-text" id="kpiMesi">12</div>
+  </div>
+  <div class="stat-card" style="border-top:2px solid rgba(239,68,68,.35)">
+    <div class="stat-label">Totale provvigioni annuo</div>
+    <div class="stat-value color-red" id="kpiProvv">€ 0,00</div>
+  </div>
+  <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.5)">
+    <div class="stat-label">Media mensile</div>
+    <div class="stat-value color-green" id="kpiMedia">€ 0,00</div>
+  </div>
+</div>
+
+<!-- Tabella flusso mensile -->
+<div class="card card-body" style="margin-bottom:20px">
+  <div class="section-title" style="margin-bottom:14px">Prospetto mensile</div>
+  <div class="table-wrap overflow-x">
+    <table id="tblFlusso" style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:var(--bg3);border-bottom:1px solid var(--border)">
+          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text2)">Mese</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--text2)">Gettoni</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--text2)">Ricorrenti</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--text2)">Totale</th>
+          <th style="padding:10px 12px;text-align:center;font-size:11px;font-weight:600;color:var(--text2)">N. Clienti</th>
+        </tr>
+      </thead>
+      <tbody id="tblFlussoBody">
+        <tr><td colspan="5" style="padding:20px;text-align:center;color:var(--text3)">Caricamento dati...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Dettaglio per cliente -->
+<div class="card card-body" style="margin-bottom:20px">
+  <div class="section-title" style="margin-bottom:14px">Dettagli per cliente</div>
+  <div id="clientiDettagli" style="display:flex;flex-direction:column;gap:12px">
+    <!-- Clienti expandibili -->
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+// Placeholder - data will be loaded via JavaScript
+document.addEventListener('DOMContentLoaded', () => {
+  // Calculate and display cash flow data
+  updateChart();
+});
+
+function updateChart() {
+  const mesi = parseInt(document.getElementById('mesiSelector').value);
+  document.getElementById('kpiMesi').textContent = mesi;
+  // TODO: Implement cash flow calculations
+}
+</script>
+{% endblock %}

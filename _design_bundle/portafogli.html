@@ -114,7 +114,6 @@
     </div>
   </div>
   <div class="flex gap-2">
-    <a href="/portafogli/{{ pf.id }}/flusso" class="btn btn-secondary">📅 Flusso cassa</a>
     <a href="/portafogli/{{ pf.id }}/export" class="btn btn-secondary">📥 Esporta Excel</a>
     <a href="/portafogli/template-import" class="btn btn-secondary">📋 Template import</a>
     <button class="btn btn-secondary" onclick="openModal('modalImport')">⬆ Importa file</button>
@@ -276,8 +275,8 @@
           </td>
           <td style="white-space:nowrap">
             <button class="btn btn-secondary btn-sm"
-                    onclick='openEditCliente({{ c.id }}, {{ (c.nome_cliente or "")|tojson }}, {{ c.consumo_override or 0 }}, {{ (c.note or "")|tojson }}, {{ (c.data_inizio_fornitura or "")|tojson }}, {{ (c.data_switch_out or "")|tojson }})'
-                    title="Modifica cliente" style="margin-right:2px">✏️</button>
+                    onclick='openEditCliente({{ c.id }}, {{ (c.nome_cliente or "")|tojson }}, {{ c.consumo_override or 0 }}, {{ (c.note or "")|tojson }})'
+                    title="Modifica consumo" style="margin-right:2px">✏️</button>
             <button class="btn btn-danger btn-sm"
                     onclick='eliminaCliente({{ c.id }}, this, {{ (c.nome_cliente or "questo cliente")|tojson }})'
                     title="Rimuovi dal portafoglio">✕</button>
@@ -351,10 +350,6 @@
                  placeholder="Lascia vuoto per usare il default dell'offerta">
         </div>
         <div class="form-group">
-          <label>Data inizio fornitura (YYYY-MM-DD)</label>
-          <input type="date" name="data_inizio_fornitura" placeholder="Es. 2025-06-01">
-        </div>
-        <div class="form-group">
           <label>Note</label>
           <input type="text" name="note" placeholder="Annotazioni opzionali">
         </div>
@@ -412,14 +407,6 @@
         <div style="font-size:11px;color:var(--text3);margin-top:4px">
           I margini verranno ricalcolati automaticamente con il nuovo consumo.
         </div>
-      </div>
-      <div class="form-group">
-        <label>Data inizio fornitura (YYYY-MM-DD)</label>
-        <input type="date" name="data_inizio_fornitura" id="editDataInizioInput" placeholder="Es. 2025-06-01">
-      </div>
-      <div class="form-group">
-        <label>Data switch-out (YYYY-MM-DD)</label>
-        <input type="date" name="data_switch_out" id="editDataSwitchOutInput" placeholder="Es. 2026-06-01">
       </div>
       <div class="form-group">
         <label>Note</label>
@@ -486,12 +473,10 @@ async function eliminaCliente(id, btn, nome){
 }
 
 // ── Edit consumo modal ─────────────────────────────────────────────────────────
-function openEditCliente(id, nome, consumo, note, data_inizio, data_switch_out){
+function openEditCliente(id, nome, consumo, note){
   document.getElementById('editClienteNome').textContent = 'Cliente: ' + nome;
   document.getElementById('editConsumoInput').value = consumo || '';
   document.getElementById('editNoteInput').value = note || '';
-  document.getElementById('editDataInizioInput').value = data_inizio || '';
-  document.getElementById('editDataSwitchOutInput').value = data_switch_out || '';
   document.getElementById('formEditCliente').action = `/portafogli/{{ pf.id if view == 'dettaglio' else 0 }}/clienti/${id}/aggiorna`;
   openModal('modalEditCliente');
 }

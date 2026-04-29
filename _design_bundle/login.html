@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UFLOW — Accesso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#082b14;
+  --card-bg:rgba(8,38,18,0.78);
+  --border:rgba(16,185,129,.28);
+  --border2:rgba(16,185,129,.42);
+  --text:#e8f5ee;--text2:#a3c9b4;--text3:#6b9e82;
+  --accent:#10b981;--accent2:#34d399;--accent3:#6ee7b7;
+  --font:'Inter',system-ui,sans-serif;
+  --mono:'JetBrains Mono',monospace;
+}
+
+html,body{
+  height:100%;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+
+/* ── Canvas sfondo animato ──────────────────────────────────────────────────── */
+#bg-canvas{
+  position:fixed;inset:0;z-index:0;
+}
+
+
+/* ── Wrapper centrato ───────────────────────────────────────────────────────── */
+.page{
+  position:relative;z-index:2;
+  min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;
+}
+
+/* ── Card ───────────────────────────────────────────────────────────────────── */
+.card{
+  width:100%;max-width:400px;
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:20px;
+  padding:40px 36px 32px;
+  backdrop-filter:blur(24px);
+  box-shadow:
+    0 0 0 1px rgba(16,185,129,.08),
+    0 32px 64px rgba(0,0,0,.7),
+    0 0 80px rgba(16,185,129,.07);
+  animation:cardIn .55s cubic-bezier(.22,.68,0,1.2) both;
+}
+
+@keyframes cardIn{
+  from{opacity:0;transform:translateY(28px) scale(.97)}
+  to  {opacity:1;transform:translateY(0) scale(1)}
+}
+
+/* ── Logo ───────────────────────────────────────────────────────────────────── */
+.logo-wrap{
+  display:flex;flex-direction:column;align-items:center;
+  gap:10px;margin-bottom:32px;
+  animation:fadeUp .5s .1s both;
+}
+.logo-leaf{
+  filter:drop-shadow(0 0 14px rgba(52,211,153,.6));
+  animation:pulse 3s ease-in-out infinite;
+}
+@keyframes pulse{
+  0%,100%{filter:drop-shadow(0 0 10px rgba(52,211,153,.55))}
+  50%     {filter:drop-shadow(0 0 24px rgba(52,211,153,.85))}
+}
+.brand-name{
+  font-size:22px;font-weight:800;letter-spacing:-.5px;
+  background:linear-gradient(135deg,#34d399,#10b981 60%,#059669);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.brand-sub{
+  font-size:11px;color:var(--text3);letter-spacing:.4px;text-transform:uppercase;
+  margin-top:-6px;
+}
+
+/* ── Badge live ─────────────────────────────────────────────────────────────── */
+.live-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 11px;border-radius:99px;
+  background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);
+  font-size:10px;font-weight:500;color:var(--accent3);letter-spacing:.4px;
+  margin-bottom:28px;
+  animation:fadeUp .5s .2s both;
+}
+.live-dot{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 6px var(--accent);
+  animation:blink 1.4s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Intestazione form ──────────────────────────────────────────────────────── */
+.form-head{margin-bottom:22px;animation:fadeUp .5s .15s both}
+.form-title{font-size:18px;font-weight:700;letter-spacing:-.35px}
+.form-sub{font-size:12px;color:var(--text3);margin-top:5px;line-height:1.5}
+
+/* ── Tab ────────────────────────────────────────────────────────────────────── */
+.tabs{
+  display:flex;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:10px;padding:3px;margin-bottom:22px;
+  animation:fadeUp .5s .2s both;
+}
+.tab{
+  flex:1;padding:8px;border-radius:8px;border:none;cursor:pointer;
+  font-size:12px;font-weight:500;font-family:var(--font);
+  background:transparent;color:var(--text3);transition:all .2s;
+}
+.tab.active{
+  background:rgba(16,185,129,.15);color:var(--accent2);
+  border:1px solid rgba(16,185,129,.25);
+  box-shadow:0 1px 4px rgba(0,0,0,.25);
+}
+
+/* ── Campi ──────────────────────────────────────────────────────────────────── */
+.fields{animation:fadeUp .5s .25s both}
+.fg{margin-bottom:14px;position:relative}
+.fg label{
+  display:block;font-size:10px;color:var(--text3);
+  margin-bottom:6px;font-weight:600;letter-spacing:.35px;text-transform:uppercase;
+}
+.fg input{
+  width:100%;padding:11px 14px;
+  border-radius:10px;border:1px solid rgba(255,255,255,.09);
+  background:rgba(255,255,255,.05);
+  color:var(--text);font-size:14px;font-family:var(--font);
+  outline:none;transition:all .2s;
+}
+.fg input:focus{
+  border-color:rgba(16,185,129,.5);
+  background:rgba(16,185,129,.06);
+  box-shadow:0 0 0 3px rgba(16,185,129,.1);
+}
+.fg input::placeholder{color:var(--text3)}
+
+/* ── Bottone ────────────────────────────────────────────────────────────────── */
+.btn-submit{
+  width:100%;padding:13px;margin-top:4px;
+  border-radius:10px;border:none;cursor:pointer;
+  font-size:14px;font-weight:700;font-family:var(--font);color:#fff;
+  background:linear-gradient(135deg,#10b981 0%,#059669 100%);
+  position:relative;overflow:hidden;
+  transition:all .2s;
+  box-shadow:0 4px 16px rgba(16,185,129,.35),0 1px 0 rgba(255,255,255,.1) inset;
+  animation:fadeUp .5s .3s both;
+}
+.btn-submit::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,transparent 60%);
+  opacity:0;transition:opacity .2s;
+}
+.btn-submit:hover{
+  transform:translateY(-1px);
+  box-shadow:0 8px 24px rgba(16,185,129,.45),0 1px 0 rgba(255,255,255,.1) inset;
+}
+.btn-submit:hover::before{opacity:1}
+.btn-submit:active{transform:translateY(0);box-shadow:0 2px 8px rgba(16,185,129,.3)}
+
+/* ── Alert errore ───────────────────────────────────────────────────────────── */
+.alert{
+  display:flex;align-items:center;gap:9px;
+  padding:10px 13px;margin-bottom:16px;
+  border-radius:9px;
+  background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);
+  color:#f87171;font-size:12px;line-height:1.5;
+}
+
+/* ── Separatore ─────────────────────────────────────────────────────────────── */
+.divider{
+  display:flex;align-items:center;gap:10px;
+  margin:18px 0;color:var(--text3);font-size:10px;letter-spacing:.3px;
+  animation:fadeUp .5s .35s both;
+}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
+
+/* ── Hint demo ──────────────────────────────────────────────────────────────── */
+.hint{
+  padding:11px 13px;border-radius:9px;
+  background:rgba(16,185,129,.05);border:1px solid rgba(16,185,129,.12);
+  font-size:11px;color:var(--text2);line-height:1.6;
+  animation:fadeUp .5s .4s both;
+}
+.hint strong{color:var(--accent3)}
+
+/* ── Footer ─────────────────────────────────────────────────────────────────── */
+.footer{
+  margin-top:20px;text-align:center;
+  font-size:10px;color:var(--text3);line-height:1.8;
+  animation:fadeUp .5s .45s both;
+}
+
+@keyframes fadeUp{
+  from{opacity:0;transform:translateY(10px)}
+  to  {opacity:1;transform:translateY(0)}
+}
+
+/* Mobile */
+@media(max-width:480px){
+  .card{padding:28px 22px 24px;border-radius:16px}
+  .brand-name{font-size:18px}
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="page">
+  <div class="card">
+
+    <!-- Logo -->
+    <div class="logo-wrap">
+      <svg class="logo-leaf" viewBox="0 0 60 72" width="56" height="67">
+        <path d="M30,4 C37,6 51,22 51,38 C51,54 41,65 30,66 C24,66 16,61 13,53 C10,45 15,37 21,31 C27,24 26,10 30,4 Z" fill="#34d399"/>
+        <path d="M30,12 C35,15 45,27 44,38 C43,50 36,60 30,61 C26,60 21,56 19,50 C17,44 21,38 27,33 C32,27 30,18 30,12 Z" fill="#059669"/>
+        <path d="M35,19 L23,40 L30,40 L25,54 L39,33 L32,33 Z" fill="#14532d"/>
+      </svg>
+      <div class="brand-name">UFLOW</div>
+      <div class="brand-sub">Piattaforma margini energia</div>
+    </div>
+
+    <!-- Badge live -->
+    <div style="display:flex;justify-content:center">
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        Mercato libero · Italia
+      </div>
+    </div>
+
+    <!-- Header form -->
+    <div class="form-head">
+      <div class="form-title" id="formTitle">Bentornato</div>
+      <div class="form-sub" id="formSub">Accedi con le tue credenziali per continuare</div>
+    </div>
+
+    <!-- Tab accedi / registrati -->
+    <div class="tabs">
+      <button class="tab active" id="tabLogin"  onclick="setMode('login')">Accedi</button>
+      <button class="tab"        id="tabSignup" onclick="setMode('signup')">Crea account</button>
+    </div>
+
+    <!-- Errore -->
+    {% if error %}
+    <div class="alert">⚠️ {{ error }}</div>
+    {% endif %}
+
+    <!-- Form -->
+    <form method="POST">
+      <input type="hidden" name="mode" id="modeInput" value="login">
+      <div class="fields">
+        <div class="fg">
+          <label>Email aziendale</label>
+          <input type="email" name="email" placeholder="nome@azienda.it" required autofocus autocomplete="email">
+        </div>
+        <div class="fg">
+          <label>Password</label>
+          <input type="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+      </div>
+      <button type="submit" class="btn-submit" id="submitBtn">Accedi →</button>
+    </form>
+
+    <div class="divider">oppure</div>
+
+    <div class="hint">
+      💡 <strong>Nuovo utente?</strong> Clicca su "Crea account" e registrati con la tua email per accedere alla piattaforma con offerte, fornitori e simulazioni già precaricati.
+    </div>
+
+    <div class="footer">
+      Uso interno · Dati riservati<br>
+      <span>© 2025 UFLOW</span>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ── Tab switch ─────────────────────────────────────────────────────────────── */
+function setMode(m){
+  document.getElementById('modeInput').value = m;
+  document.getElementById('submitBtn').textContent = m === 'signup' ? 'Crea account →' : 'Accedi →';
+  document.getElementById('tabLogin').classList.toggle('active', m === 'login');
+  document.getElementById('tabSignup').classList.toggle('active', m === 'signup');
+  document.getElementById('formTitle').textContent = m === 'signup' ? 'Crea il tuo account' : 'Bentornato';
+  document.getElementById('formSub').textContent   = m === 'signup'
+    ? 'Registrati per accedere alla piattaforma di simulazione'
+    : 'Accedi con le tue credenziali per continuare';
+}
+
+/* ── Canvas particelle ──────────────────────────────────────────────────────── */
+(function(){
+  const canvas = document.getElementById('bg-canvas');
+  const ctx    = canvas.getContext('2d');
+  let W, H, particles, animId;
+
+  function resize(){
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function rand(min,max){ return Math.random()*(max-min)+min; }
+
+  const N = 55;
+  function init(){
+    particles = Array.from({length:N},()=>({
+      x:   rand(0,W),
+      y:   rand(0,H),
+      r:   rand(1, 2.8),
+      vx:  rand(-.18,.18),
+      vy:  rand(-.22,-.06),
+      a:   rand(0,1),
+      da:  rand(.003,.008),
+      phase: rand(0, Math.PI*2)
+    }));
+  }
+
+  // Orbs grandi pulsanti
+  const orbs = [
+    {x:.15,y:.55,r:380, c:'rgba(16,185,129,'},
+    {x:.78,y:.22,r:280, c:'rgba(5,150,105,'},
+    {x:.5, y:.92,r:220, c:'rgba(52,211,153,'},
+    {x:.88,y:.75,r:160, c:'rgba(16,185,129,'},
+  ];
+
+  let tick = 0;
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+
+    // Sfondo verde scuro
+    ctx.fillStyle = '#082b14';
+    ctx.fillRect(0,0,W,H);
+
+    // Orbs animati
+    orbs.forEach((o,i)=>{
+      const pulse = Math.sin(tick*.012 + i*1.5)*.06;
+      const alpha = (.18 + pulse).toFixed(3);
+      const grd = ctx.createRadialGradient(o.x*W,o.y*H,0,o.x*W,o.y*H,o.r*(1+pulse*.3));
+      grd.addColorStop(0, o.c+alpha+')');
+      grd.addColorStop(1, o.c+'0)');
+      ctx.fillStyle = grd;
+      ctx.beginPath();
+      ctx.arc(o.x*W, o.y*H, o.r*(1+pulse*.3), 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    // Particelle fluttuanti
+    particles.forEach(p=>{
+      const flicker = Math.sin(tick*.04 + p.phase)*.25 + .65;
+      ctx.globalAlpha = Math.min(p.a * flicker, .85);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fillStyle = '#34d399';
+      ctx.fill();
+
+      // Aggiorna
+      p.x  += p.vx;
+      p.y  += p.vy;
+      p.a  += p.da * (Math.sin(tick*.03+p.phase) > 0 ? 1 : -1);
+      p.a   = Math.max(0, Math.min(1, p.a));
+
+      if(p.x < -5) p.x = W+5;
+      if(p.x > W+5) p.x = -5;
+      if(p.y < -5){ p.y = H+5; p.x = rand(0,W); }
+    });
+    ctx.globalAlpha = 1;
+
+    // Linee-connessione tra particelle vicine
+    for(let i=0;i<particles.length;i++){
+      for(let j=i+1;j<particles.length;j++){
+        const dx=particles[i].x-particles[j].x, dy=particles[i].y-particles[j].y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<110){
+          ctx.globalAlpha = (1-dist/110)*.12;
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x,particles[i].y);
+          ctx.lineTo(particles[j].x,particles[j].y);
+          ctx.strokeStyle='#10b981';
+          ctx.lineWidth=.8;
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    tick++;
+    animId = requestAnimationFrame(draw);
+  }
+
+  resize();
+  init();
+  draw();
+  window.addEventListener('resize',()=>{ resize(); init(); });
+})();
+</script>
+</body>
+</html>
