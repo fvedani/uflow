@@ -2871,19 +2871,33 @@ def export_confronto_pdf():
 
     story.append(Spacer(1, 0.2*cm))
 
-    # Tabella con solo i dati tecnici - usando Paragraph per formattazione corretta
+    # Calcoli per risparmio assoluto
+    consumo_a = sa.get('consumo_medio', 0)
+    spread_annuo_a = sa.get('spread_vendita', 0) * consumo_a / 12
+    spread_annuo_b = sb.get('spread_vendita', 0) * consumo_a / 12
+    risp_spread = spread_annuo_a - spread_annuo_b
+
+    quota_annua_a = sa.get('quota_fissa', 0) * 12
+    quota_annua_b = sb.get('quota_fissa', 0) * 12
+    risp_quota = quota_annua_a - quota_annua_b
+
+    # Tabella con dati tecnici - usando Paragraph per formattazione corretta
     text_style = ParagraphStyle('normal', fontName='Helvetica', fontSize=8, alignment=0)
     header_style = ParagraphStyle('header', fontName='Helvetica-Bold', fontSize=8, alignment=1)
 
     data = [
         [Paragraph('VOCE', header_style), Paragraph('SCENARIO A', header_style), Paragraph('SCENARIO B', header_style), Paragraph('DIFFERENZA', header_style)],
         [Paragraph('Offerta', text_style), Paragraph(str(sa.get('nome_offerta', '—')), text_style), Paragraph(str(sb.get('nome_offerta', '—')), text_style), Paragraph('', text_style)],
-        [Paragraph('Fornitore', text_style), Paragraph(str(sa.get('nome_fornitore', '—')), text_style), Paragraph(str(sb.get('nome_fornitore', '—')), text_style), Paragraph('', text_style)],
         [Paragraph('Piano', text_style), Paragraph(str(sa.get('nome_piano', '—')), text_style), Paragraph(str(sb.get('nome_piano', '—')), text_style), Paragraph('', text_style)],
         [Paragraph('Spread vendita (€/unità)', text_style), Paragraph(f"{sa.get('spread_vendita', 0):.4f}", text_style), Paragraph(f"{sb.get('spread_vendita', 0):.4f}", text_style), Paragraph(f"{sb.get('spread_vendita', 0) - sa.get('spread_vendita', 0):+.4f}", text_style)],
-        [Paragraph('Spread acquisto (€/unità)', text_style), Paragraph(f"{sa.get('spread_acquisto', 0):.4f}", text_style), Paragraph(f"{sb.get('spread_acquisto', 0):.4f}", text_style), Paragraph(f"{sb.get('spread_acquisto', 0) - sa.get('spread_acquisto', 0):+.4f}", text_style)],
+        [Paragraph('Risparmio spread/anno (€)', text_style), Paragraph(f"€{risp_spread:.2f}", text_style), Paragraph('—', text_style), Paragraph('', text_style)],
         [Paragraph('Quota fissa (€/mese)', text_style), Paragraph(f"{sa.get('quota_fissa', 0):.2f}", text_style), Paragraph(f"{sb.get('quota_fissa', 0):.2f}", text_style), Paragraph(f"{sb.get('quota_fissa', 0) - sa.get('quota_fissa', 0):+.2f}", text_style)],
+        [Paragraph('Risparmio quota/anno (€)', text_style), Paragraph(f"€{risp_quota:.2f}", text_style), Paragraph('—', text_style), Paragraph('', text_style)],
         [Paragraph('Consumo medio', text_style), Paragraph(f"{sa.get('consumo_medio', 0):.2f}", text_style), Paragraph(f"{sb.get('consumo_medio', 0):.2f}", text_style), Paragraph(f"{sb.get('consumo_medio', 0) - sa.get('consumo_medio', 0):+.2f}", text_style)],
+        [Paragraph('Prov. agente (€/unità)', text_style), Paragraph(f"€{sa.get('prov_agente', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_agente', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_agente', 0) - sa.get('prov_agente', 0):+.2f}", text_style)],
+        [Paragraph('Prov. sub-agente (€/unità)', text_style), Paragraph(f"€{sa.get('prov_sub_agente', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_sub_agente', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_sub_agente', 0) - sa.get('prov_sub_agente', 0):+.2f}", text_style)],
+        [Paragraph('Prov. area manager (€/unità)', text_style), Paragraph(f"€{sa.get('prov_area_manager', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_area_manager', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_area_manager', 0) - sa.get('prov_area_manager', 0):+.2f}", text_style)],
+        [Paragraph('Totale provvigioni (€)', text_style), Paragraph(f"€{sa.get('totale_provvigioni', 0):.2f}", text_style), Paragraph(f"€{sb.get('totale_provvigioni', 0):.2f}", text_style), Paragraph(f"€{sb.get('totale_provvigioni', 0) - sa.get('totale_provvigioni', 0):+.2f}", text_style)],
     ]
 
     table = Table(data, colWidths=[4.5*cm, 3.5*cm, 3.5*cm, 3.5*cm])
