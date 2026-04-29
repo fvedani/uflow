@@ -87,7 +87,7 @@
     <div>
       <div style="font-size:13px;color:var(--text2);margin-bottom:4px">📊 Risparmio cliente annuo (basato su ultimi 12 mesi PUN/PSV)</div>
       <div style="font-size:24px;font-weight:700;font-family:var(--mono);color:{% if risparmio > 0 %}var(--green){% elif risparmio < 0 %}var(--red){% else %}var(--text2){% endif %}">
-        {% if risparmio > 0 %}+{% endif %}€{{ risparmio|n2 }}
+        €{{ (risparmio|abs)|n2 }}/anno {% if risparmio > 0 %}<span style="color:var(--green)">✓</span>{% elif risparmio < 0 %}<span style="color:var(--red)">✗</span>{% endif %}
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -111,10 +111,10 @@
       <thead>
         <tr>
           <th>Mese</th>
-          <th style="text-align:right;color:#e3b341">PUN/PSV</th>
-          <th style="text-align:right;color:#7c9dff">Costo A</th>
-          <th style="text-align:right;color:#bc8cff">Costo B</th>
-          <th style="text-align:right">Risparmio</th>
+          <th style="text-align:right;color:#e3b341">PUN/PSV €/MWh</th>
+          <th style="text-align:right;color:#7c9dff">Costo A €</th>
+          <th style="text-align:right;color:#bc8cff">Costo B €</th>
+          <th style="text-align:right">Risparmio €</th>
         </tr>
       </thead>
       <tbody>
@@ -125,10 +125,10 @@
         <tr>
           <td class="mono" style="font-size:12px">{{ ma.label }}</td>
           <td class="mono" style="text-align:right;color:#e3b341;font-size:12px">{{ ma.prezzo_mwh|n2 }}</td>
-          <td class="mono" style="text-align:right;color:#7c9dff;font-size:12px">€{{ ma.costo_mensile|n2 }}</td>
-          <td class="mono" style="text-align:right;color:#bc8cff;font-size:12px">€{{ (mb.costo_mensile or 0)|n2 }}</td>
+          <td class="mono" style="text-align:right;color:#7c9dff;font-size:12px">{{ ma.costo_mensile|n2 }}</td>
+          <td class="mono" style="text-align:right;color:#bc8cff;font-size:12px">{{ (mb.costo_mensile or 0)|n2 }}</td>
           <td class="mono fw-600" style="text-align:right;font-size:12px;color:{% if risp_m > 0 %}var(--green){% elif risp_m < 0 %}var(--red){% else %}var(--text3){% endif %}">
-            {% if risp_m > 0 %}+{% endif %}€{{ risp_m|n2 }}
+            {{ risp_m|n2 }}
           </td>
         </tr>
         {% endfor %}
