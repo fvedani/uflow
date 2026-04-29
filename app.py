@@ -2844,64 +2844,98 @@ def export_confronto_pdf():
         abort(404)
     sa, sb = dict(sa), dict(sb)
 
-    # Colori UFLOW (tema verde)
-    COLOR_GREEN = colors.HexColor('#10b981')
+    # Colori UFLOW
     COLOR_GREEN_DARK = colors.HexColor('#059669')
-    COLOR_GREEN_LIGHT = colors.HexColor('#d1fae5')
+    COLOR_LIGHT_BG = colors.HexColor('#f0fdf4')
 
     # Crea PDF
     pdf_file = io.BytesIO()
-    doc = SimpleDocTemplate(pdf_file, pagesize=A4, topMargin=0.5*cm, bottomMargin=1.5*cm, leftMargin=2*cm, rightMargin=2*cm)
+    doc = SimpleDocTemplate(pdf_file, pagesize=A4, topMargin=1*cm, bottomMargin=1.5*cm, leftMargin=1.5*cm, rightMargin=1.5*cm)
     story = []
 
-    # Info confronto
-    title_style = ParagraphStyle(
-        'TitleStyle',
-        fontName='Helvetica-Bold',
-        fontSize=14,
-        textColor=COLOR_GREEN_DARK,
-        spaceAfter=2,
-        alignment=1
-    )
-    story.append(Paragraph('Scheda Tecnica Confronto Offerte', title_style))
+    # Logo PNG al centro
+    try:
+        logo_path = os.path.join(os.path.dirname(__file__), 'static/img/logo.png')
+        if os.path.exists(logo_path):
+            logo = Image(logo_path, width=1.5*cm, height=1.5*cm)
+            logo_para = Paragraph('<img src="%s" width="40" height="40"/>' % logo_path, ParagraphStyle('c', alignment=1))
+            logo_table = Table([[logo]], colWidths=[15*cm])
+            logo_table.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
+            story.append(logo_table)
+            story.append(Spacer(1, 0.4*cm))
+    except:
+        pass
 
-    subtitle_style = ParagraphStyle(
-        'SubtitleStyle',
-        fontName='Helvetica',
-        fontSize=8,
-        textColor=colors.HexColor('#6b7280'),
-        spaceAfter=12,
-        alignment=1
-    )
-    story.append(Paragraph(f'{sa.get("nome_offerta", "—")} <b>vs</b> {sb.get("nome_offerta", "—")} — {datetime.now().strftime("%d/%m/%Y")}', subtitle_style))
+    # Titolo
+    title_style = ParagraphStyle('Title', fontName='Helvetica-Bold', fontSize=13, textColor=COLOR_GREEN_DARK, alignment=1, spaceAfter=8)
+    story.append(Paragraph('CONFRONTO SCENARI — Scheda Tecnica', title_style))
+    story.append(Spacer(1, 0.3*cm))
 
-    # Tabella scheda tecnica
-    data = [['Parametro', 'Offerta A', 'Offerta B', 'Differenza']]
+    # Tabella principale con tutte le voci
+    data = [['VOCE', 'SCENARIO A', 'SCENARIO B', 'DIFFERENZA (B-A)']]
+
+    # ANAGRAFICA
+    data.append(['<b>ANAGRAFICA</b>', '', '', ''])
+    data.append(['Offerta', sa.get('nome_offerta', '—'), sb.get('nome_offerta', '—'), 'diversa' if sa.get('nome_offerta') != sb.get('nome_offerta') else ''])
+    data.append(['Fornitore', sa.get('nome_fornitore', '—'), sb.get('nome_fornitore', '—'), ''])
+    data.append(['Piano provvisionale', sa.get('nome_piano', '—'), sb.get('nome_piano', '—'), ''])
+
+    # PARAMETRI TECNICI
+    data.append(['<b>PARAMETRI TECNICI</b>', '', '', ''])
     spread_diff = sb.get('spread_vendita', 0) - sa.get('spread_vendita', 0)
     quota_diff = sb.get('quota_fissa', 0) - sa.get('quota_fissa', 0)
-    provv_diff = sb.get('totale_provvigioni', 0) - sa.get('totale_provvigioni', 0)
+    consumo_diff = sb.get('consumo_medio', 0) - sa.get('consumo_medio', 0)
+
+    data.append(['Spread vendita (€/unità)', f'{sa.get("spread_vendita", 0):.4f}', f'{sb.get("spread_vendita", 0):.4f}', f'{spread_diff:+.4f}'])
+    data.append(['Spread acquisto (€/unità)', f'{sa.get("spread_acquisto", 0):.4f}', f'{sb.get("spread_acquisto", 0):.4f}', f'{(sb.get("spread_acquisto", 0) - sa.get("spread_acquisto", 0)):+.4f}'])
+    data.append(['Quota fissa vendita (€/mese)', f'{sa.get("quota_fissa", 0):.2f}', f'{sb.get("quota_fissa", 0):.2f}', f'{quota_diff:+.2f}'])
+    data.append(['Costo gestione PDP (€/mese)', f'{sa.get("costo_pdp", 0):.2f}', f'{sb.get("costo_pdp", 0):.2f}', f'{(sb.get("costo_pdp", 0) - sa.get("costo_pdp", 0)):+.2f}'])
+    data.append(['Consumo medio', f'{sa.get("consumo_medio", 0):.2f}', f'{sb.get("consumo_medio", 0):.2f}', f'{consumo_diff:+.2f}'])
+
+    # COMPOSIZIONE MARGINI
+    data.append(['<b>COMPOSIZIONE MARGINI</b>', '', '', ''])
+    margin_spread_diff = sb.get('margine_spread_annuo', 0) - sa.get('margine_spread_annuo', 0)
+    margin_qf_diff = sb.get('margine_qf_annuo', 0) - sa.get('margine_qf_annuo', 0)
+    margin_lordo_diff = sb.get('margine_lordo', 0) - sa.get('margine_lordo', 0)
+
+    data.append(['Margine spread annuo', f'€{sa.get("margine_spread_annuo", 0):.2f}', f'€{sb.get("margine_spread_annuo", 0):.2f}', f'€{margin_spread_diff:+.2f}'])
+    data.append(['Margine QF annuo', f'€{sa.get("margine_qf_annuo", 0):.2f}', f'€{sb.get("margine_qf_annuo", 0):.2f}', f'€{margin_qf_diff:+.2f}'])
+    data.append(['Margine lordo', f'€{sa.get("margine_lordo", 0):.2f}', f'€{sb.get("margine_lordo", 0):.2f}', f'€{margin_lordo_diff:+.2f}'])
+
+    # PROVVIGIONI
+    data.append(['<b>PROVVIGIONI</b>', '', '', ''])
+    prov_agent_diff = sb.get('prov_agente', 0) - sa.get('prov_agente', 0)
+    prov_subagent_diff = sb.get('prov_sub_agente', 0) - sa.get('prov_sub_agente', 0)
+    prov_areamanager_diff = sb.get('prov_area_manager', 0) - sa.get('prov_area_manager', 0)
+    prov_total_diff = sb.get('totale_provvigioni', 0) - sa.get('totale_provvigioni', 0)
+
+    data.append(['Prov. agente', f'€{sa.get("prov_agente", 0):.2f}', f'€{sb.get("prov_agente", 0):.2f}', f'€{prov_agent_diff:+.2f}'])
+    data.append(['Prov. sub-agente', f'€{sa.get("prov_sub_agente", 0):.2f}', f'€{sb.get("prov_sub_agente", 0):.2f}', f'€{prov_subagent_diff:+.2f}'])
+    data.append(['Prov. area manager', f'€{sa.get("prov_area_manager", 0):.2f}', f'€{sb.get("prov_area_manager", 0):.2f}', f'€{prov_areamanager_diff:+.2f}'])
+    data.append(['Totale provvigioni', f'€{sa.get("totale_provvigioni", 0):.2f}', f'€{sb.get("totale_provvigioni", 0):.2f}', f'€{prov_total_diff:+.2f}'])
+
+    # RISULTATO
+    data.append(['<b>RISULTATO</b>', '', '', ''])
     netto_diff = sb.get('margine_netto', 0) - sa.get('margine_netto', 0)
+    pct_diff = sb.get('margine_percentuale', 0) - sa.get('margine_percentuale', 0)
 
-    data.append(['Spread (€/unità)', f'{sa.get("spread_vendita", 0):.4f}', f'{sb.get("spread_vendita", 0):.4f}', f'{spread_diff:+.4f}'])
-    data.append(['Quota fissa (€/mese)', f'{sa.get("quota_fissa", 0):.2f}', f'{sb.get("quota_fissa", 0):.2f}', f'{quota_diff:+.2f}'])
-    data.append(['Provvigioni (€)', f'{sa.get("totale_provvigioni", 0):.2f}', f'{sb.get("totale_provvigioni", 0):.2f}', f'{provv_diff:+.2f}'])
-    data.append(['Margine Netto (€)', f'{sa.get("margine_netto", 0):.2f}', f'{sb.get("margine_netto", 0):.2f}', f'{netto_diff:+.2f}'])
+    data.append(['Margine netto', f'€{sa.get("margine_netto", 0):.2f}', f'€{sb.get("margine_netto", 0):.2f}', f'€{netto_diff:+.2f}'])
+    data.append(['Margine %', f'{sa.get("margine_percentuale", 0):.1f}%', f'{sb.get("margine_percentuale", 0):.1f}%', f'{pct_diff:+.1f}%'])
 
-    table = Table(data, colWidths=[4*cm, 2.5*cm, 2.5*cm, 2.5*cm])
+    table = Table(data, colWidths=[5*cm, 2.8*cm, 2.8*cm, 3*cm])
     table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), COLOR_GREEN_DARK),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 10),
-        ('FONTSIZE', (0, 1), (-1, -1), 9),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
-        ('TOPPADDING', (0, 1), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 1), (-1, -1), 6),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#d1fae5')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f0fdf4')]),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 1), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#c7d2e0')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, COLOR_LIGHT_BG]),
     ]))
     story.append(table)
 
