@@ -6,7 +6,10 @@
       "Bash(git commit -m 'Feat: PUN/PSV prezzi mercato e analisi costo cliente nel confronto *)",
       "Bash(git commit -m 'Fix: Rimuovi sezione Analisi Costo Cliente che causa errore *)",
       "Bash(git commit -m 'Feat: Aggiungi sezione Analisi Costo Cliente nel confronto *)",
-      "Bash(git commit -m 'Fix: Applica filtri di formattazione italiana a tutti i numeri *)"
+      "Bash(git commit -m 'Fix: Applica filtri di formattazione italiana a tutti i numeri *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }

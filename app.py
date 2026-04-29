@@ -2855,9 +2855,9 @@ def export_confronto_pdf():
 
     # Logo al centro in alto
     try:
-        logo_path = os.path.join(os.path.dirname(__file__), 'static/img/logo.png')
+        logo_path = os.path.join(os.path.dirname(__file__), 'static/img/uflow-logo.svg')
         if os.path.exists(logo_path):
-            logo = Image(logo_path, width=2.5*cm, height=1.2*cm)
+            logo = Image(logo_path, width=3*cm, height=1.5*cm)
             logo_table = Table([[logo]], colWidths=[17.5*cm])
             logo_table.setStyle(TableStyle([
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),

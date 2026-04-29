@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 290" width="300" height="290">
+  <defs>
+
+
+
+    <linearGradient id="topBarGrad" x1="88" y1="0" x2="258" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#c2f5e4"></stop>
+      <stop offset="45%" stop-color="#3fd9a0"></stop>
+      <stop offset="100%" stop-color="#0ea86a"></stop>
+    </linearGradient>
+  </defs>
+
+
+
+
+
+  <path d="&#xA;    M  97,18 L 251,18&#xA;    Q 258,18 254.96,24.03&#xA;    L 243.04,49.97&#xA;    Q 240,56 233,56&#xA;    L  79,56&#xA;    Q  72,56  75.04,49.97&#xA;    L  86.96,24.03&#xA;    Q  90,18  97,18 Z&#xA;  " fill="url(#topBarGrad)"></path>
+
+
+
+  <path d="&#xA;    M  79,66 L 233,66&#xA;    Q 240,66 236.96,72.03&#xA;    L 225.04,97.97&#xA;    Q 222,104 215,104&#xA;    L  61,104&#xA;    Q  54,104  57.04,97.97&#xA;    L  68.96,72.03&#xA;    Q  72,66  79,66 Z&#xA;  " fill="#16a06b"></path>
+
+
+
+  <path d="&#xA;    M  61,114 L 215,114&#xA;    Q 222,114 218.96,120.03&#xA;    L 207.04,145.97&#xA;    Q 204,152 197,152&#xA;    L  43,152&#xA;    Q  36,152  39.04,145.97&#xA;    L  50.96,120.03&#xA;    Q  54,114  61,114 Z&#xA;  " fill="#0b5e3d"></path>
+
+
+  <circle cx="252" cy="21" r="5" fill="white"></circle>
+
+
+  <text x="150" y="237" text-anchor="middle" font-family="Montserrat, &#39;Arial Black&#39;, sans-serif" font-weight="800" font-size="58" letter-spacing="4" fill="#00d080">UFLOW</text>
+</svg>
