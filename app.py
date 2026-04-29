@@ -2844,79 +2844,99 @@ def export_confronto_pdf():
         abort(404)
     sa, sb = dict(sa), dict(sb)
 
-    # Colori UFLOW
-    COLOR_GREEN = colors.HexColor('#10b981')
-    COLOR_LIGHT_BG = colors.HexColor('#f0fdf4')
+    COLOR_GREEN_DARK = colors.HexColor('#1b5e3f')
+    text_style = ParagraphStyle('normal', fontName='Helvetica', fontSize=9, alignment=1)
+    header_style = ParagraphStyle('header', fontName='Helvetica-Bold', fontSize=9, alignment=1, textColor=colors.whitesmoke)
 
-    # Crea PDF
     pdf_file = io.BytesIO()
-    doc = SimpleDocTemplate(pdf_file, pagesize=A4, topMargin=0.8*cm, bottomMargin=1.2*cm, leftMargin=1.2*cm, rightMargin=1.2*cm)
+    doc = SimpleDocTemplate(pdf_file, pagesize=A4, topMargin=1*cm, bottomMargin=1*cm, leftMargin=1.5*cm, rightMargin=1.5*cm)
     story = []
 
-    # Logo al centro in alto
+    # Logo
     try:
         logo_path = os.path.join(os.path.dirname(__file__), 'static/img/uflow-logo.png')
         if os.path.exists(logo_path):
-            logo = Image(logo_path, width=3*cm, height=1.8*cm)
-            logo_table = Table([[logo]], colWidths=[17.5*cm])
-            logo_table.setStyle(TableStyle([
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('TOPPADDING', (0, 0), (-1, -1), 0),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 0)
-            ]))
+            logo = Image(logo_path, width=2.5*cm, height=1.5*cm)
+            logo_table = Table([[logo]], colWidths=[16*cm])
+            logo_table.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER')]))
             story.append(logo_table)
-            story.append(Spacer(1, 0.4*cm))
+            story.append(Spacer(1, 0.6*cm))
     except:
         pass
 
-    story.append(Spacer(1, 0.2*cm))
+    # Calcoli
+    consumo = sa.get('consumo_medio', 0)
+    spread_diff = sa.get('spread_vendita', 0) - sb.get('spread_vendita', 0)
+    costo_spread_a = sa.get('spread_vendita', 0) * consumo
+    costo_spread_b = sb.get('spread_vendita', 0) * consumo
+    costo_spread_diff = costo_spread_a - costo_spread_b
 
-    # Calcoli per risparmio assoluto
-    consumo_a = sa.get('consumo_medio', 0)
-    spread_annuo_a = sa.get('spread_vendita', 0) * consumo_a / 12
-    spread_annuo_b = sb.get('spread_vendita', 0) * consumo_a / 12
-    risp_spread = spread_annuo_a - spread_annuo_b
+    quota_a = sa.get('quota_fissa', 0) * 12
+    quota_b = sb.get('quota_fissa', 0) * 12
+    quota_diff = quota_a - quota_b
 
-    quota_annua_a = sa.get('quota_fissa', 0) * 12
-    quota_annua_b = sb.get('quota_fissa', 0) * 12
-    risp_quota = quota_annua_a - quota_annua_b
+    risp_totale = costo_spread_diff + quota_diff
 
-    # Tabella con dati tecnici - usando Paragraph per formattazione corretta
-    text_style = ParagraphStyle('normal', fontName='Helvetica', fontSize=8, alignment=0)
-    header_style = ParagraphStyle('header', fontName='Helvetica-Bold', fontSize=8, alignment=1)
-
+    # Tabella principale
     data = [
-        [Paragraph('VOCE', header_style), Paragraph('SCENARIO A', header_style), Paragraph('SCENARIO B', header_style), Paragraph('DIFFERENZA', header_style)],
-        [Paragraph('Offerta', text_style), Paragraph(str(sa.get('nome_offerta', '—')), text_style), Paragraph(str(sb.get('nome_offerta', '—')), text_style), Paragraph('', text_style)],
-        [Paragraph('Piano', text_style), Paragraph(str(sa.get('nome_piano', '—')), text_style), Paragraph(str(sb.get('nome_piano', '—')), text_style), Paragraph('', text_style)],
-        [Paragraph('Spread vendita (€/unità)', text_style), Paragraph(f"{sa.get('spread_vendita', 0):.4f}", text_style), Paragraph(f"{sb.get('spread_vendita', 0):.4f}", text_style), Paragraph(f"{sb.get('spread_vendita', 0) - sa.get('spread_vendita', 0):+.4f}", text_style)],
-        [Paragraph('Risparmio spread/anno (€)', text_style), Paragraph(f"€{risp_spread:.2f}", text_style), Paragraph('—', text_style), Paragraph('', text_style)],
-        [Paragraph('Quota fissa (€/mese)', text_style), Paragraph(f"{sa.get('quota_fissa', 0):.2f}", text_style), Paragraph(f"{sb.get('quota_fissa', 0):.2f}", text_style), Paragraph(f"{sb.get('quota_fissa', 0) - sa.get('quota_fissa', 0):+.2f}", text_style)],
-        [Paragraph('Risparmio quota/anno (€)', text_style), Paragraph(f"€{risp_quota:.2f}", text_style), Paragraph('—', text_style), Paragraph('', text_style)],
-        [Paragraph('Consumo medio', text_style), Paragraph(f"{sa.get('consumo_medio', 0):.2f}", text_style), Paragraph(f"{sb.get('consumo_medio', 0):.2f}", text_style), Paragraph(f"{sb.get('consumo_medio', 0) - sa.get('consumo_medio', 0):+.2f}", text_style)],
-        [Paragraph('Prov. agente (€/unità)', text_style), Paragraph(f"€{sa.get('prov_agente', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_agente', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_agente', 0) - sa.get('prov_agente', 0):+.2f}", text_style)],
-        [Paragraph('Prov. sub-agente (€/unità)', text_style), Paragraph(f"€{sa.get('prov_sub_agente', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_sub_agente', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_sub_agente', 0) - sa.get('prov_sub_agente', 0):+.2f}", text_style)],
-        [Paragraph('Prov. area manager (€/unità)', text_style), Paragraph(f"€{sa.get('prov_area_manager', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_area_manager', 0):.2f}", text_style), Paragraph(f"€{sb.get('prov_area_manager', 0) - sa.get('prov_area_manager', 0):+.2f}", text_style)],
-        [Paragraph('Totale provvigioni (€)', text_style), Paragraph(f"€{sa.get('totale_provvigioni', 0):.2f}", text_style), Paragraph(f"€{sb.get('totale_provvigioni', 0):.2f}", text_style), Paragraph(f"€{sb.get('totale_provvigioni', 0) - sa.get('totale_provvigioni', 0):+.2f}", text_style)],
+        [Paragraph('VOCE', header_style), Paragraph('OFFERTA 1', header_style), Paragraph('OFFERTA 2', header_style), Paragraph('DIFFERENZA', header_style)],
+        ['Offerta', sa.get('nome_offerta', '—'), sb.get('nome_offerta', '—'), ''],
+        ['Consumo Stimato (smc)', f"{consumo:.2f}", f"{consumo:.2f}", ''],
+        ['Spread (€/smc)', f"{sa.get('spread_vendita', 0):.3f}", f"{sb.get('spread_vendita', 0):.3f}", f"{spread_diff:+.3f}"],
+        ['COSTO SPREAD', f"{costo_spread_a:.2f}", f"{costo_spread_b:.2f}", f"{costo_spread_diff:.2f}"],
+        ['Quota Fissa (€/mese)', f"{sa.get('quota_fissa', 0):.2f}", f"{sb.get('quota_fissa', 0):.2f}", f"{sa.get('quota_fissa', 0) - sb.get('quota_fissa', 0):+.2f}"],
+        ['COSTO QF', f"{quota_a:.2f}", f"{quota_b:.2f}", f"{quota_diff:.2f}"],
+        ['RISPARMIO TOTALE', '', '', f"{risp_totale:.2f}"],
     ]
 
-    table = Table(data, colWidths=[4.5*cm, 3.5*cm, 3.5*cm, 3.5*cm])
+    table = Table(data, colWidths=[5*cm, 3.5*cm, 3.5*cm, 3.5*cm])
     table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), COLOR_GREEN),
+        ('BACKGROUND', (0, 0), (-1, 0), COLOR_GREEN_DARK),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
         ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
         ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+        ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
         ('LEFTPADDING', (0, 0), (-1, -1), 6),
         ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1fae5')),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, COLOR_LIGHT_BG]),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.white]),
     ]))
     story.append(table)
+    story.append(Spacer(1, 0.5*cm))
 
-    # Build PDF
+    # Tabella provvigioni
+    prov_data = [
+        [Paragraph('PROVVIGIONI', header_style), Paragraph('VALORE (€/smc)', header_style), Paragraph('TOTALE (€)', header_style)],
+        ['Introducer', f"€{sa.get('prov_agente', 0):.2f}", f"{sa.get('prov_agente', 0) * consumo:.2f}"],
+        ['Gestore', f"€{sa.get('prov_sub_agente', 0):.2f}", f"{sa.get('prov_sub_agente', 0) * consumo:.2f}"],
+        ['TOTALE', '', f"{sa.get('totale_provvigioni', 0):.2f}"],
+    ]
+
+    prov_table = Table(prov_data, colWidths=[5*cm, 3.5*cm, 3.5*cm])
+    prov_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), COLOR_GREEN_DARK),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('ALIGN', (1, 1), (-1, -1), 'RIGHT'),
+        ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#999999')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.white]),
+    ]))
+    story.append(prov_table)
+
     doc.build(story)
     pdf_file.seek(0)
     return send_file(pdf_file, as_attachment=True,
