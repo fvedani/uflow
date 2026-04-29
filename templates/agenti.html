@@ -340,6 +340,7 @@ body.theme-light .filter-select,body.theme-light .filter-input{background:#f5f5f
                 <button class="btn btn-secondary btn-sm" onclick='openAssegnaModal({{ a.id }}, {{ (a.nome ~ " " ~ a.cognome)|tojson }})' title="Portafogli">📁</button>
                 <form method="POST" action="/agenti/{{ a.id }}/elimina"
                       onsubmit='return confirm({{ ("Rimuovere " ~ a.nome ~ " " ~ a.cognome ~ " dalla rete?")|tojson }})' style="margin:0">
+                  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
                   <button class="btn btn-danger btn-sm">🗑</button>
                 </form>
               </div>
@@ -811,7 +812,7 @@ function updateParentOptions() {
   if (!parentSelect) return;
   Array.from(parentSelect.options).forEach(opt => {
     if (!opt.value) return;
-    const optRole = opt.dataset.role || '';
+    const optRole = opt.dataset.ruolo || '';
     opt.style.display = allowed.includes(optRole) ? '' : 'none';
   });
   const sel = parentSelect.options[parentSelect.selectedIndex];
