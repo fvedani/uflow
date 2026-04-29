@@ -3014,10 +3014,10 @@ def _agenti_kpi(aw, ap):
     out = []
     for r in rows:
         d = dict(r)
-        d['pct_margine'] = round(d['tot_margine'] / d['target_margine_annuo'] * 100) \
-            if d.get('target_margine_annuo') else None
-        d['pct_clienti'] = round(d['n_clienti'] / d['target_clienti'] * 100) \
-            if d.get('target_clienti') else None
+        target_margine = d.get('target_margine_annuo', 0) or 0
+        target_clienti = d.get('target_clienti', 0) or 0
+        d['pct_margine'] = round(d.get('tot_margine', 0) / target_margine * 100) if target_margine > 0 else None
+        d['pct_clienti'] = round(d.get('n_clienti', 0) / target_clienti * 100) if target_clienti > 0 else None
         out.append(d)
     return out
 
