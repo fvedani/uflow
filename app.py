@@ -2336,7 +2336,7 @@ def portafoglio_import(pf_id):
                  nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
                  spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
                  margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                 to_insert)
             db.commit()
 
