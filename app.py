@@ -2270,8 +2270,21 @@ def portafoglio_import(pf_id):
         if data_inizio_str:
             try:
                 if isinstance(data_inizio_str, str):
-                    data_inizio = data_inizio_str.split(' ')[0] if ' ' in data_inizio_str else data_inizio_str
-                    dt.strptime(data_inizio, '%Y-%m-%d')
+                    # Rimuovi timestamp se presente (es. da Excel)
+                    data_str = data_inizio_str.split(' ')[0] if ' ' in data_inizio_str else data_inizio_str
+                    # Prova YYYY-MM-DD, poi DD/MM/YYYY, DD-MM-YYYY
+                    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
+                        try:
+                            dt.strptime(data_str, fmt)
+                            if fmt == '%d/%m/%Y' or fmt == '%d-%m-%Y':
+                                # Converti a YYYY-MM-DD per consistenza DB
+                                d = dt.strptime(data_str, fmt)
+                                data_inizio = d.strftime('%Y-%m-%d')
+                            else:
+                                data_inizio = data_str
+                            break
+                        except ValueError:
+                            continue
                 else:
                     data_inizio = None
             except Exception:
