@@ -2168,21 +2168,22 @@ def portafoglio_flusso(pf_id):
 @app.route('/portafogli/<int:pf_id>/import', methods=['POST'])
 @login_required
 def portafoglio_import(pf_id):
-    anda, andp = uid_and()
-    with get_db() as db:
-        pf = db.execute(f'SELECT id FROM portafogli WHERE id=? {anda}', [pf_id]+andp).fetchone()
-    if not pf:
-        abort(404)
-
-    file = request.files.get('file')
-    if not file or not file.filename:
-        flash('Nessun file selezionato.', 'warning')
-        return redirect(url_for('portafoglio_dettaglio', pf_id=pf_id))
-
-    fname = file.filename.lower()
-    rows  = []
-
     try:
+        anda, andp = uid_and()
+        with get_db() as db:
+            pf = db.execute(f'SELECT id FROM portafogli WHERE id=? {anda}', [pf_id]+andp).fetchone()
+        if not pf:
+            abort(404)
+
+        file = request.files.get('file')
+        if not file or not file.filename:
+            flash('Nessun file selezionato.', 'warning')
+            return redirect(url_for('portafoglio_dettaglio', pf_id=pf_id))
+
+        fname = file.filename.lower()
+        rows  = []
+
+        try:
         if fname.endswith('.csv'):
             content = file.read().decode('utf-8-sig')
             reader  = csv.DictReader(io.StringIO(content))
@@ -2340,11 +2341,18 @@ def portafoglio_import(pf_id):
                 to_insert)
             db.commit()
 
-    msg = f'Import completato: {ok} clienti aggiunti'
-    if skipped:
-        msg += f', {skipped} righe saltate'
-    flash(msg + ('.  Errori: ' + ' | '.join(errors[:3]) if errors else '.'), 'success' if ok else 'warning')
-    return redirect(url_for('portafoglio_dettaglio', pf_id=pf_id))
+        msg = f'Import completato: {ok} clienti aggiunti'
+        if skipped:
+            msg += f', {skipped} righe saltate'
+        flash(msg + ('.  Errori: ' + ' | '.join(errors[:3]) if errors else '.'), 'success' if ok else 'warning')
+        return redirect(url_for('portafoglio_dettaglio', pf_id=pf_id))
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[IMPORT ERROR] {e}", file=__import__('sys').stderr)
+        print(tb, file=__import__('sys').stderr)
+        flash(f'Errore durante l\'import: {str(e)[:200]}', 'error')
+        return redirect(url_for('portafoglio_dettaglio', pf_id=pf_id))
 
 
 # ── Export Excel report portafoglio ──────────────────────────────────────────
