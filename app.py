@@ -2343,26 +2343,15 @@ def portafoglio_import(pf_id):
         ok += 1
 
     if to_insert:
+        sql = '''INSERT INTO clienti_portafoglio
+            (portafoglio_id,user_id,pod_pdr,nome_cliente,offerta_id,piano_id,consumo_override,note,
+             nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
+             spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
+             margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''
         with get_db() as db:
-            try:
-                db.executemany('''INSERT INTO clienti_portafoglio
-                    (portafoglio_id,user_id,pod_pdr,nome_cliente,offerta_id,piano_id,consumo_override,note,
-                     nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
-                     spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
-                     margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                    to_insert)
-            except Exception:
-                # Fallback senza pod_pdr se la colonna non esiste ancora
-                to_insert_no_pod = [r[1:] for r in to_insert]  # rimuovi pod_pdr (indice 2 → shift)
-                to_insert_no_pod = [(r[0], r[1]) + r[3:] for r in to_insert]  # salta pod_pdr
-                db.executemany('''INSERT INTO clienti_portafoglio
-                    (portafoglio_id,user_id,nome_cliente,offerta_id,piano_id,consumo_override,note,
-                     nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
-                     spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
-                     margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                    to_insert_no_pod)
+            for row_vals in to_insert:
+                db.execute(sql, row_vals)
             db.commit()
 
     msg = f'Import completato: {ok} clienti aggiunti'
