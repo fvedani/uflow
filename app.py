@@ -2269,22 +2269,23 @@ def portafoglio_import(pf_id):
         data_inizio = None
         if data_inizio_str:
             try:
-                if isinstance(data_inizio_str, str):
-                    # Rimuovi timestamp se presente (es. da Excel)
-                    data_str = data_inizio_str.split(' ')[0] if ' ' in data_inizio_str else data_inizio_str
-                    # Prova YYYY-MM-DD, poi DD/MM/YYYY, DD-MM-YYYY
-                    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
-                        try:
-                            dt.strptime(data_str, fmt)
-                            if fmt == '%d/%m/%Y' or fmt == '%d-%m-%Y':
-                                # Converti a YYYY-MM-DD per consistenza DB
+                # Se è un oggetto datetime (da Excel), usa direttamente
+                if hasattr(data_inizio_str, 'date'):
+                    data_inizio = data_inizio_str.date().strftime('%Y-%m-%d')
+                elif isinstance(data_inizio_str, str):
+                    # Rimuovi timestamp se presente
+                    data_str = data_inizio_str.split(' ')[0].strip()
+                    if not data_str:
+                        data_inizio = None
+                    else:
+                        # Prova YYYY-MM-DD, poi DD/MM/YYYY, DD-MM-YYYY
+                        for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
+                            try:
                                 d = dt.strptime(data_str, fmt)
                                 data_inizio = d.strftime('%Y-%m-%d')
-                            else:
-                                data_inizio = data_str
-                            break
-                        except ValueError:
-                            continue
+                                break
+                            except ValueError:
+                                continue
                 else:
                     data_inizio = None
             except Exception:
