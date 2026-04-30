@@ -2230,7 +2230,7 @@ def portafoglio_import(pf_id):
         existing_pods = {r[0].upper() for r in db.execute(
             "SELECT pod_pdr FROM clienti_portafoglio WHERE portafoglio_id=? AND pod_pdr IS NOT NULL AND pod_pdr != ''",
             [pf_id]
-        ).fetchall()}
+        ).fetchall() if r[0]}
         existing_names = {r[0] for r in db.execute(
             "SELECT LOWER(nome_cliente) FROM clienti_portafoglio WHERE portafoglio_id=? AND (pod_pdr IS NULL OR pod_pdr = '')",
             [pf_id]
