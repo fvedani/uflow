@@ -233,6 +233,7 @@
     <table id="tblClienti">
       <thead>
         <tr>
+          <th>POD/PDR</th>
           <th class="pf-sort" onclick="sortPf('nome_cliente')" style="cursor:pointer;user-select:none">Cliente <span class="pf-sort-icon" id="psort-nome_cliente">↕</span></th>
           <th>Offerta</th><th>Fornitore</th><th>Piano</th>
           <th>Comm.</th>
@@ -247,12 +248,13 @@
       <tbody id="tblClientiBody">
         {% for c in clienti | sort(attribute='margine_netto', reverse=true) %}
         {% set mn_class = 'color-green' if (c.margine_netto or 0) >= 0 else 'color-red' %}
-        <tr data-search="{{ (c.nome_cliente or '')|lower }} {{ (c.nome_offerta or '')|lower }}"
+        <tr data-search="{{ (c.pod_pdr or '')|lower }} {{ (c.nome_cliente or '')|lower }} {{ (c.nome_offerta or '')|lower }}"
             data-nome_cliente="{{ (c.nome_cliente or '')|lower }}"
             data-consumo_override="{{ c.consumo_override or 0 }}"
             data-margine_lordo="{{ c.margine_lordo or 0 }}"
             data-margine_netto="{{ c.margine_netto or 0 }}"
             data-margine_percentuale="{{ c.margine_percentuale or 0 }}">
+          <td style="font-size:11px;color:var(--text3);white-space:nowrap">{{ c.pod_pdr or '—' }}</td>
           <td><strong>{{ c.nome_cliente or '—' }}</strong></td>
           <td class="text-muted">{{ c.nome_offerta or '—' }}</td>
           <td class="text-muted" style="font-size:11px">{{ c.nome_fornitore or '—' }}</td>
@@ -276,7 +278,7 @@
           </td>
           <td style="white-space:nowrap">
             <button class="btn btn-secondary btn-sm"
-                    onclick='openEditCliente({{ c.id }}, {{ (c.nome_cliente or "")|tojson }}, {{ c.consumo_override or 0 }}, {{ (c.note or "")|tojson }}, {{ (c.data_inizio_fornitura or "")|tojson }}, {{ (c.data_switch_out or "")|tojson }})'
+                    onclick='openEditCliente({{ c.id }}, {{ (c.nome_cliente or "")|tojson }}, {{ c.consumo_override or 0 }}, {{ (c.note or "")|tojson }}, {{ (c.data_inizio_fornitura or "")|tojson }}, {{ (c.data_switch_out or "")|tojson }}, {{ (c.pod_pdr or "")|tojson }})'
                     title="Modifica cliente" style="margin-right:2px">✏️</button>
             <button class="btn btn-danger btn-sm"
                     onclick='eliminaCliente({{ c.id }}, this, {{ (c.nome_cliente or "questo cliente")|tojson }})'
@@ -288,7 +290,7 @@
       <!-- Riga totali -->
       <tfoot>
         <tr style="border-top:2px solid var(--border2)">
-          <td colspan="6" style="font-weight:700;color:var(--text2);font-size:12px">TOTALE ({{ n_clienti }} clienti)</td>
+          <td colspan="7" style="font-weight:700;color:var(--text2);font-size:12px">TOTALE ({{ n_clienti }} clienti)</td>
           <td class="mono fw-600 color-accent" style="text-align:right">€{{ '%.2f'|format(tot_lordo) }}</td>
           <td class="mono fw-600 color-red"    style="text-align:right">€{{ '%.2f'|format(tot_provv) }}</td>
           <td class="mono fw-600 {{ 'color-green' if tot_netto >= 0 else 'color-red' }}" style="text-align:right">€{{ '%.2f'|format(tot_netto) }}</td>
@@ -321,7 +323,11 @@
     </div>
     <form method="POST" action="/portafogli/{{ pf.id }}/aggiungi-cliente">
       <div class="form-grid form-grid-2">
-        <div class="form-group" style="grid-column:1/-1">
+        <div class="form-group">
+          <label>POD / PDR <span style="color:var(--text3);font-size:10px">(opzionale)</span></label>
+          <input type="text" name="pod_pdr" placeholder="Es. IT001E12345678" style="text-transform:uppercase">
+        </div>
+        <div class="form-group">
           <label>Nome cliente</label>
           <input type="text" name="nome_cliente" placeholder="Es. Azienda ABC Srl">
         </div>
@@ -375,12 +381,12 @@
       <button class="modal-close" onclick="closeModal('modalImport')">✕</button>
     </div>
     <div class="alert alert-info" style="margin-bottom:10px;font-size:12px;flex-direction:column;align-items:flex-start;gap:6px">
-      <div><strong>Colonne richieste:</strong> <code>Nome Cliente</code>, <code>Offerta</code>, <code>Piano Provvigionale</code>, <code>Consumo</code> (opz.), <code>Data Inizio Fornitura</code> (opz.), <code>Note</code> (opz.)</div>
+      <div><strong>Colonne:</strong> <code>POD/PDR</code> (opz.), <code>Nome Cliente</code>, <code>Offerta</code>, <code>Piano Provvigionale</code>, <code>Consumo</code> (opz.), <code>Data Inizio Fornitura</code> (opz.), <code>Note</code> (opz.)</div>
       <div>Scarica il <a href="/portafogli/template-import" style="color:var(--accent3);font-weight:600">📋 template Excel</a> con offerte e piani già elencati.</div>
     </div>
     <div class="alert alert-success" style="margin-bottom:16px;font-size:12px;flex-direction:column;align-items:flex-start;gap:4px">
       <div>✅ <strong>I clienti vengono aggiunti</strong> a quelli esistenti (nessuna sovrascrittura).</div>
-      <div>🔍 <strong>Doppioni rilevati automaticamente</strong>: clienti con lo stesso nome già presenti nel portafoglio verranno saltati.</div>
+      <div>🔍 <strong>Doppioni rilevati automaticamente</strong>: se è presente il POD/PDR viene usato come chiave univoca, altrimenti viene usato il nome cliente.</div>
     </div>
     <form method="POST" action="/portafogli/{{ pf.id }}/import" enctype="multipart/form-data">
       <div class="form-group">
@@ -405,6 +411,10 @@
     </div>
     <form id="formEditCliente" method="POST" action="">
       <div style="font-size:12px;color:var(--text3);margin-bottom:14px" id="editClienteNome"></div>
+      <div class="form-group">
+        <label>POD / PDR <span style="color:var(--text3);font-size:10px">(opzionale)</span></label>
+        <input type="text" name="pod_pdr" id="editPodPdrInput" placeholder="Es. IT001E12345678" style="text-transform:uppercase">
+      </div>
       <div class="form-group">
         <label>Consumo individuale</label>
         <input type="number" name="consumo" id="editConsumoInput" step="any" min="0"
@@ -486,8 +496,9 @@ async function eliminaCliente(id, btn, nome){
 }
 
 // ── Edit consumo modal ─────────────────────────────────────────────────────────
-function openEditCliente(id, nome, consumo, note, data_inizio, data_switch_out){
+function openEditCliente(id, nome, consumo, note, data_inizio, data_switch_out, pod_pdr){
   document.getElementById('editClienteNome').textContent = 'Cliente: ' + nome;
+  document.getElementById('editPodPdrInput').value = pod_pdr || '';
   document.getElementById('editConsumoInput').value = consumo || '';
   document.getElementById('editNoteInput').value = note || '';
   document.getElementById('editDataInizioInput').value = data_inizio || '';

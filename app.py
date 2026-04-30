@@ -382,6 +382,7 @@ def init_db():
             "ALTER TABLE clienti_portafoglio ADD COLUMN IF NOT EXISTS tipo_consumo TEXT",
             "ALTER TABLE clienti_portafoglio ADD COLUMN IF NOT EXISTS data_inizio_fornitura TEXT",
             "ALTER TABLE clienti_portafoglio ADD COLUMN IF NOT EXISTS data_switch_out TEXT",
+            "ALTER TABLE clienti_portafoglio ADD COLUMN IF NOT EXISTS pod_pdr TEXT",
         ]
         for sql in migrations:
             try:
@@ -1954,6 +1955,7 @@ def portafoglio_aggiungi_cliente(pf_id):
     piano_id    = int(f['piano_id'])
     consumo_ov  = float(f['consumo']) if f.get('consumo') else None
     nome_cliente = f.get('nome_cliente', '').strip() or f'Cliente {datetime.now().strftime("%d/%m %H:%M")}'
+    pod_pdr     = f.get('pod_pdr', '').strip().upper() or None
     note        = f.get('note', '').strip()
     data_inizio = f.get('data_inizio_fornitura', '').strip() or None
 
@@ -1964,12 +1966,12 @@ def portafoglio_aggiungi_cliente(pf_id):
 
     with get_db() as db:
         db.execute('''INSERT INTO clienti_portafoglio
-            (portafoglio_id,user_id,nome_cliente,offerta_id,piano_id,consumo_override,note,
+            (portafoglio_id,user_id,pod_pdr,nome_cliente,offerta_id,piano_id,consumo_override,note,
              nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
              spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
              margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-            (pf_id, current_user.id, nome_cliente, offerta_id, piano_id,
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+            (pf_id, current_user.id, pod_pdr, nome_cliente, offerta_id, piano_id,
              consumo_ov or r['consumo_medio'], note,
              r['nome_offerta'], r['nome_fornitore'], r['nome_piano'], r['commodity'],
              r.get('tipo_consumo', ''),
@@ -2004,6 +2006,7 @@ def portafoglio_aggiorna_cliente(pf_id, cid):
             abort(404)
     consumo_str = request.form.get('consumo', '').strip()
     note = request.form.get('note', c['note'] or '')
+    pod_pdr = request.form.get('pod_pdr', '').strip().upper() or c.get('pod_pdr') or None
     data_inizio = request.form.get('data_inizio_fornitura', '').strip() or c.get('data_inizio_fornitura')
     data_switch_out = request.form.get('data_switch_out', '').strip() or c.get('data_switch_out')
     consumo_ov = float(consumo_str) if consumo_str else c['consumo_override']
@@ -2012,12 +2015,12 @@ def portafoglio_aggiorna_cliente(pf_id, cid):
     if r:
         with get_db() as db:
             db.execute('''UPDATE clienti_portafoglio SET
-                consumo_override=?, note=?, data_inizio_fornitura=?, data_switch_out=?,
+                pod_pdr=?, consumo_override=?, note=?, data_inizio_fornitura=?, data_switch_out=?,
                 nome_offerta=?,nome_fornitore=?,nome_piano=?,commodity=?,tipo_consumo=?,
                 spread_vendita=?,spread_acquisto=?,quota_fissa=?,costo_gestione_pdp=?,
                 margine_lordo=?,totale_provvigioni=?,margine_netto=?,margine_percentuale=?
                 WHERE id=? AND portafoglio_id=?''',
-                (consumo_ov, note, data_inizio, data_switch_out,
+                (pod_pdr, consumo_ov, note, data_inizio, data_switch_out,
                  r['nome_offerta'],r['nome_fornitore'],r['nome_piano'],r['commodity'],
                  r.get('tipo_consumo',''),
                  r['spread_vendita'],r['spread_acquisto'],r['quota_fissa'],r['costo_gestione_pdp'],
@@ -2027,8 +2030,8 @@ def portafoglio_aggiorna_cliente(pf_id, cid):
         flash('Cliente aggiornato e margini ricalcolati.', 'success')
     else:
         with get_db() as db:
-            db.execute('UPDATE clienti_portafoglio SET consumo_override=?, note=?, data_inizio_fornitura=?, data_switch_out=? WHERE id=? AND portafoglio_id=?',
-                       (consumo_ov, note, data_inizio, data_switch_out, cid, pf_id))
+            db.execute('UPDATE clienti_portafoglio SET pod_pdr=?, consumo_override=?, note=?, data_inizio_fornitura=?, data_switch_out=? WHERE id=? AND portafoglio_id=?',
+                       (pod_pdr, consumo_ov, note, data_inizio, data_switch_out, cid, pf_id))
             db.commit()
         flash('Consumo aggiornato (offerta o piano non disponibili per il ricalcolo).', 'warning')
     return redirect(url_for('portafoglio_dettaglio', pf_id=pf_id))
@@ -2092,7 +2095,7 @@ def portafoglio_template_import():
     hfont = Font(bold=True, color='7c9dff', size=10)
     ha    = Alignment(horizontal='center', vertical='center')
 
-    headers = [('Nome Cliente',22),('Offerta (nome esatto)',28),
+    headers = [('POD / PDR (opzionale)',20),('Nome Cliente',22),('Offerta (nome esatto)',28),
                ('Piano Provvigionale (nome esatto)',30),('Consumo (lascia vuoto = default offerta)',36),
                ('Data Inizio Fornitura (YYYY-MM-DD)',26),('Note',24)]
     for col,(h,w) in enumerate(headers,1):
@@ -2106,15 +2109,15 @@ def portafoglio_template_import():
     ex_piano   = piani[0]['nome_piano']     if piani   else 'NOME_PIANO'
     ef = PatternFill('solid',fgColor='161b22')
     for i in range(1,6):
-        for col in range(1,7):
-            c = ws.cell(row=i+1,column=col,value='' if col!=2 else (ex_offerta if i==1 else ''))
+        for col in range(1,8):
+            c = ws.cell(row=i+1,column=col,value='')
             c.font=Font(color='e6edf3',size=10); c.fill=ef
             c.alignment=Alignment(vertical='center')
-        ws.cell(row=i+1,column=1,value=f'Cliente {i}').font=Font(color='e6edf3',size=10)
+        ws.cell(row=i+1,column=2,value=f'Cliente {i}').font=Font(color='e6edf3',size=10)
         if i==1:
-            ws.cell(row=2,column=2,value=ex_offerta)
-            ws.cell(row=2,column=3,value=ex_piano)
-            ws.cell(row=2,column=5,value='2025-06-01')
+            ws.cell(row=2,column=3,value=ex_offerta)
+            ws.cell(row=2,column=4,value=ex_piano)
+            ws.cell(row=2,column=6,value='2025-06-01')
         ws.row_dimensions[i+1].height=16
 
     # Foglio di riferimento con offerte/piani disponibili
@@ -2221,11 +2224,26 @@ def portafoglio_import(pf_id):
                      if aw2 else \
                      {p['nome_piano'].lower(): dict(p)
                       for p in db.execute('SELECT * FROM piani_provvigionali').fetchall()}
-        # Precarica voci provvigionali per tutti i piani (abbinamento automatico)
         voci_db = {pd['id']: load_piano_voci(db, pd['id']) for pd in piani_db.values()}
+        # Pre-carica chiavi deduplicazione: POD/PDR (se presenti) e nomi clienti senza POD/PDR
+        existing_pods = {r[0].upper() for r in db.execute(
+            "SELECT pod_pdr FROM clienti_portafoglio WHERE portafoglio_id=? AND pod_pdr IS NOT NULL AND pod_pdr != ''",
+            [pf_id]
+        ).fetchall()}
+        existing_names = {r[0] for r in db.execute(
+            "SELECT LOWER(nome_cliente) FROM clienti_portafoglio WHERE portafoglio_id=? AND (pod_pdr IS NULL OR pod_pdr = '')",
+            [pf_id]
+        ).fetchall()}
+
+    # Pre-carica fornitori medi per commodity (evita N query nel loop)
+    fornitori_cache = {}
+
+    from datetime import datetime as dt
 
     ok = 0; skipped = 0; errors = []
+    to_insert = []
     for i, row in enumerate(rows, 1):
+        pod_pdr      = _col(row,'pod','pdr').strip().upper()
         nome_cliente = _col(row,'nome cliente','cliente','name') or f'Cliente {i}'
         nome_offerta = _col(row,'offerta')
         nome_piano   = _col(row,'piano')
@@ -2248,60 +2266,65 @@ def portafoglio_import(pf_id):
         except ValueError:
             consumo_ov = None
 
-        # Parse data_inizio_fornitura: handle datetime objects from Excel and string dates
         data_inizio = None
         if data_inizio_str:
             try:
-                # If it's a datetime string from Excel (e.g. "2025-06-01 00:00:00"), extract date part
                 if isinstance(data_inizio_str, str):
-                    # Try YYYY-MM-DD format first
-                    if ' ' in data_inizio_str:
-                        data_inizio = data_inizio_str.split(' ')[0]
-                    else:
-                        data_inizio = data_inizio_str
-                    # Validate it's a valid date format
-                    from datetime import datetime as dt
+                    data_inizio = data_inizio_str.split(' ')[0] if ' ' in data_inizio_str else data_inizio_str
                     dt.strptime(data_inizio, '%Y-%m-%d')
                 else:
                     data_inizio = None
-            except:
+            except Exception:
                 data_inizio = None
 
-        fornitore_d = _get_fornitore_for_api(None, offerta_d)
+        commodity = offerta_d['commodity']
+        if commodity not in fornitori_cache:
+            fornitori_cache[commodity] = _get_fornitore_for_api(None, offerta_d)
+        fornitore_d = fornitori_cache[commodity]
         if not fornitore_d:
-            errors.append(f'Riga {i} ("{nome_cliente}"): nessun fornitore per {offerta_d["commodity"]}')
+            errors.append(f'Riga {i} ("{nome_cliente}"): nessun fornitore per {commodity}')
             skipped += 1; continue
 
-        # Controllo doppioni: skip se nome_cliente già presente nel portafoglio
-        with get_db() as db:
-            dup = db.execute(
-                'SELECT id FROM clienti_portafoglio WHERE portafoglio_id=? AND LOWER(nome_cliente)=LOWER(?)',
-                [pf_id, nome_cliente]
-            ).fetchone()
-        if dup:
-            errors.append(f'Riga {i} ("{nome_cliente}"): già presente — saltato')
-            skipped += 1
-            continue
+        # Controllo doppioni: POD/PDR se presente, altrimenti nome cliente
+        if pod_pdr:
+            if pod_pdr in existing_pods:
+                errors.append(f'Riga {i} ("{nome_cliente}"): POD/PDR {pod_pdr} già presente — saltato')
+                skipped += 1
+                continue
+        else:
+            if nome_cliente.lower() in existing_names:
+                errors.append(f'Riga {i} ("{nome_cliente}"): già presente — saltato')
+                skipped += 1
+                continue
 
         voci_p = voci_db.get(piano_d['id'], [])
         r = calcola_simulazione(offerta_d, fornitore_d, piano_d, consumo_ov, voci_p)
+        to_insert.append((
+            pf_id, current_user.id, pod_pdr or None, nome_cliente,
+            offerta_d['id'], piano_d['id'],
+            consumo_ov or r['consumo_medio'], note,
+            offerta_d['nome_offerta'], fornitore_d.get('nome', 'Media automatica'),
+            piano_d['nome_piano'], offerta_d['commodity'], offerta_d.get('tipo_consumo', ''),
+            r['spread_vendita'], r['spread_acquisto'], r['quota_fissa'], r['costo_gestione_pdp'],
+            r['margine_lordo'], r['totale_provvigioni'], r['margine_netto'], r['margine_percentuale'],
+            data_inizio,
+        ))
+        if pod_pdr:
+            existing_pods.add(pod_pdr)
+        else:
+            existing_names.add(nome_cliente.lower())
+        ok += 1
+
+    if to_insert:
         with get_db() as db:
-            db.execute('''INSERT INTO clienti_portafoglio
-                (portafoglio_id,user_id,nome_cliente,offerta_id,piano_id,consumo_override,note,
+            db.executemany('''INSERT INTO clienti_portafoglio
+                (portafoglio_id,user_id,pod_pdr,nome_cliente,offerta_id,piano_id,consumo_override,note,
                  nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
                  spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
                  margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                (pf_id, current_user.id, nome_cliente,
-                 offerta_d['id'], piano_d['id'],
-                 consumo_ov or r['consumo_medio'], note,
-                 offerta_d['nome_offerta'], fornitore_d.get('nome','Media automatica'),
-                 piano_d['nome_piano'], offerta_d['commodity'], offerta_d.get('tipo_consumo',''),
-                 r['spread_vendita'], r['spread_acquisto'], r['quota_fissa'], r['costo_gestione_pdp'],
-                 r['margine_lordo'], r['totale_provvigioni'], r['margine_netto'], r['margine_percentuale'],
-                 data_inizio))
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                to_insert)
             db.commit()
-        ok += 1
 
     msg = f'Import completato: {ok} clienti aggiunti'
     if skipped:
