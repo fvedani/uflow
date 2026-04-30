@@ -2225,15 +2225,28 @@ def portafoglio_import(pf_id):
                      {p['nome_piano'].lower(): dict(p)
                       for p in db.execute('SELECT * FROM piani_provvigionali').fetchall()}
         voci_db = {pd['id']: load_piano_voci(db, pd['id']) for pd in piani_db.values()}
-        # Pre-carica chiavi deduplicazione: POD/PDR (se presenti) e nomi clienti senza POD/PDR
-        existing_pods = {r[0].upper() for r in db.execute(
-            "SELECT pod_pdr FROM clienti_portafoglio WHERE portafoglio_id=? AND pod_pdr IS NOT NULL AND pod_pdr != ''",
-            [pf_id]
-        ).fetchall() if r[0] is not None}
-        existing_names = {r[0] for r in db.execute(
-            "SELECT LOWER(nome_cliente) FROM clienti_portafoglio WHERE portafoglio_id=? AND (pod_pdr IS NULL OR pod_pdr = '')",
-            [pf_id]
-        ).fetchall()}
+        # Assicura che la colonna pod_pdr esista (nel caso la migrazione non sia ancora applicata)
+        try:
+            db.execute("ALTER TABLE clienti_portafoglio ADD COLUMN IF NOT EXISTS pod_pdr TEXT")
+            db.commit()
+        except Exception:
+            pass
+        # Pre-carica chiavi deduplicazione
+        try:
+            existing_pods = {r[0].upper() for r in db.execute(
+                "SELECT pod_pdr FROM clienti_portafoglio WHERE portafoglio_id=? AND pod_pdr IS NOT NULL AND pod_pdr != ''",
+                [pf_id]
+            ).fetchall() if r[0] is not None}
+            existing_names = {r[0] for r in db.execute(
+                "SELECT LOWER(nome_cliente) FROM clienti_portafoglio WHERE portafoglio_id=? AND (pod_pdr IS NULL OR pod_pdr = '')",
+                [pf_id]
+            ).fetchall()}
+        except Exception:
+            existing_pods = set()
+            existing_names = {r[0] for r in db.execute(
+                'SELECT LOWER(nome_cliente) FROM clienti_portafoglio WHERE portafoglio_id=?',
+                [pf_id]
+            ).fetchall()}
 
     # Pre-carica fornitori medi per commodity (evita N query nel loop)
     fornitori_cache = {}
@@ -2331,13 +2344,25 @@ def portafoglio_import(pf_id):
 
     if to_insert:
         with get_db() as db:
-            db.executemany('''INSERT INTO clienti_portafoglio
-                (portafoglio_id,user_id,pod_pdr,nome_cliente,offerta_id,piano_id,consumo_override,note,
-                 nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
-                 spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
-                 margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                to_insert)
+            try:
+                db.executemany('''INSERT INTO clienti_portafoglio
+                    (portafoglio_id,user_id,pod_pdr,nome_cliente,offerta_id,piano_id,consumo_override,note,
+                     nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
+                     spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
+                     margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                    to_insert)
+            except Exception:
+                # Fallback senza pod_pdr se la colonna non esiste ancora
+                to_insert_no_pod = [r[1:] for r in to_insert]  # rimuovi pod_pdr (indice 2 → shift)
+                to_insert_no_pod = [(r[0], r[1]) + r[3:] for r in to_insert]  # salta pod_pdr
+                db.executemany('''INSERT INTO clienti_portafoglio
+                    (portafoglio_id,user_id,nome_cliente,offerta_id,piano_id,consumo_override,note,
+                     nome_offerta,nome_fornitore,nome_piano,commodity,tipo_consumo,
+                     spread_vendita,spread_acquisto,quota_fissa,costo_gestione_pdp,
+                     margine_lordo,totale_provvigioni,margine_netto,margine_percentuale,data_inizio_fornitura)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                    to_insert_no_pod)
             db.commit()
 
     msg = f'Import completato: {ok} clienti aggiunti'
