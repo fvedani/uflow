@@ -4,9 +4,9 @@
 {% block content %}
 <div class="page-header">
   <div style="display:flex;align-items:center;gap:12px">
-    <a href="/portafogli/{{ pf.id }}" class="btn btn-secondary btn-sm">← {{ pf.nome }}</a>
+    <a href="/portafogli/{{ pf.id }}" class="btn btn-secondary btn-sm">&#8592; {{ pf.nome }}</a>
     <div>
-      <h1 class="page-title">Flusso cassa — {{ pf.nome }}</h1>
+      <h1 class="page-title">Flusso cassa &#8212; {{ pf.nome }}</h1>
       <p class="page-subtitle">Proiezione mensile delle provvigioni e cash flow del portafoglio</p>
     </div>
   </div>
@@ -23,8 +23,8 @@
 
 {% if missing_dates %}
 <div class="alert alert-warning" style="margin-bottom:14px">
-  <strong>Attenzione:</strong> {{ missing_dates|length }} cliente(i) senza data di inizio fornitura — non inclusi nel flusso.
-  <a href="/portafogli/{{ pf.id }}" style="color:var(--accent3);margin-left:6px">Inserisci le date →</a>
+  <strong>Attenzione:</strong> {{ missing_dates|length }} cliente(i) senza data di inizio fornitura &#8212; non inclusi nel flusso.
+  <a href="/portafogli/{{ pf.id }}" style="color:var(--accent3);margin-left:6px">Inserisci le date &#8594;</a>
 </div>
 {% endif %}
 
@@ -32,19 +32,19 @@
 <div class="stat-grid stat-grid-4" style="margin-bottom:16px">
   <div class="stat-card" style="border-top:2px solid rgba(124,157,255,.5)">
     <div class="stat-label">Clienti nel flusso</div>
-    <div class="stat-value color-accent" id="kpiClienti">—</div>
+    <div class="stat-value color-accent" id="kpiClienti">&#8212;</div>
   </div>
-  <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.4)">
-    <div class="stat-label">Media mensile</div>
-    <div class="stat-value color-green" id="kpiMedia">—</div>
+  <div class="stat-card" style="border-top:2px solid rgba(245,158,11,.5)">
+    <div class="stat-label">Provvigioni totali (periodo)</div>
+    <div class="stat-value" id="kpiProvv" style="color:#f59e0b">&#8212;</div>
   </div>
   <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.6)">
-    <div class="stat-label">Totale periodo</div>
-    <div class="stat-value color-green" id="kpiTotale">—</div>
+    <div class="stat-label">Margine netto (periodo)</div>
+    <div class="stat-value color-green" id="kpiTotale">&#8212;</div>
   </div>
-  <div class="stat-card" style="border-top:2px solid rgba(124,157,255,.3)">
-    <div class="stat-label">Mese di picco</div>
-    <div class="stat-value" id="kpiPicco" style="font-size:15px">—</div>
+  <div class="stat-card" style="border-top:2px solid rgba(16,185,129,.4)">
+    <div class="stat-label">Media netta mensile</div>
+    <div class="stat-value color-green" id="kpiMedia">&#8212;</div>
   </div>
 </div>
 
@@ -53,8 +53,9 @@
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
     <div class="section-title">Andamento cash flow</div>
     <div style="display:flex;gap:16px;font-size:11px;color:var(--text3)">
-      <span><span style="display:inline-block;width:12px;height:4px;background:#7c9dff;border-radius:2px;vertical-align:middle;margin-right:4px"></span>Mensile</span>
-      <span><span style="display:inline-block;width:12px;height:4px;background:#10b981;border-radius:2px;vertical-align:middle;margin-right:4px"></span>Cumulato</span>
+      <span><span style="display:inline-block;width:12px;height:10px;background:rgba(124,157,255,0.35);border:1px solid #7c9dff;border-radius:2px;vertical-align:middle;margin-right:4px"></span>M. Lordo</span>
+      <span><span style="display:inline-block;width:12px;height:10px;background:rgba(245,158,11,0.35);border:1px solid #f59e0b;border-radius:2px;vertical-align:middle;margin-right:4px"></span>Provvigioni</span>
+      <span><span style="display:inline-block;width:12px;height:4px;background:#10b981;border-radius:2px;vertical-align:middle;margin-right:4px"></span>M. Netto cumulato</span>
     </div>
   </div>
   <div style="position:relative;height:300px">
@@ -78,10 +79,11 @@
       <thead>
         <tr style="background:var(--bg3);border-bottom:1px solid var(--border)">
           <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text2)">Mese</th>
-          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--text2)">Clienti attivi</th>
-          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--text2)">Cash flow mensile</th>
-          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--text2)">Cumulato</th>
-          <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text2)">Variazione</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:var(--text2)">Clienti</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:#7c9dff">M. Lordo</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:#f59e0b">Provvigioni</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:#10b981">M. Netto</th>
+          <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:600;color:#10b981">Cumulato netto</th>
         </tr>
       </thead>
       <tbody id="tblFlussoBody"></tbody>
@@ -104,8 +106,8 @@ const CLIENTI = {{ clienti | tojson }};
 const MESI_NOMI = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 let chartFlusso = null, chartClienti = null;
 
-function fmt(v){ return '€ ' + v.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function fmtShort(v){ return v >= 1000 ? '€ ' + (v/1000).toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1}) + 'k' : fmt(v); }
+function fmt(v){ return '€ ' + v.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtShort(v){ return v >= 1000 ? '€ ' + (v/1000).toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1}) + 'k' : fmt(v); }
 
 function meseLabel(d){ return MESI_NOMI[d.getMonth()] + ' ' + d.getFullYear(); }
 
@@ -129,17 +131,18 @@ function calcolaFlusso(nMesi) {
     const anno = oggi.getFullYear() + Math.floor((oggi.getMonth() + m) / 12);
     const mese = (oggi.getMonth() + m) % 12;
     const data = new Date(anno, mese, 1);
-    let totale = 0, nClienti = 0;
+    let lordo = 0, provv = 0, netto = 0, nClienti = 0;
     for (const c of CLIENTI) {
       if (!isClienteAttivoInMese(c, anno, mese)) continue;
-      totale += (c.margine_netto || 0) / 12;
+      lordo += (c.margine_lordo      || 0) / 12;
+      provv += (c.totale_provvigioni || 0) / 12;
+      netto += (c.margine_netto      || 0) / 12;
       nClienti++;
     }
-    risultati.push({ data, label: meseLabel(data), totale, nClienti });
+    risultati.push({ data, label: meseLabel(data), lordo, provv, netto, nClienti });
   }
-  // calcola cumulato
   let cum = 0;
-  for (const r of risultati) { cum += r.totale; r.cumulato = cum; }
+  for (const r of risultati) { cum += r.netto; r.cumulato = cum; }
   return risultati;
 }
 
@@ -147,29 +150,26 @@ function aggiorna() {
   const nMesi = parseInt(document.getElementById('mesiSelector').value);
   const flusso = calcolaFlusso(nMesi);
 
-  // KPI
   const clientiConData = CLIENTI.filter(c => c.data_inizio_fornitura).length;
-  const totale = flusso[flusso.length - 1]?.cumulato || 0;
-  const media  = totale / nMesi;
-  const piccoIdx = flusso.reduce((iMax, r, i, a) => r.totale > a[iMax].totale ? i : iMax, 0);
+  const totNetto = flusso[flusso.length - 1]?.cumulato || 0;
+  const totProvv = flusso.reduce((s, r) => s + r.provv, 0);
+  const media    = totNetto / nMesi;
   document.getElementById('kpiClienti').textContent = clientiConData;
+  document.getElementById('kpiProvv').textContent   = fmtShort(totProvv);
+  document.getElementById('kpiTotale').textContent  = fmtShort(totNetto);
   document.getElementById('kpiMedia').textContent   = fmtShort(media);
-  document.getElementById('kpiTotale').textContent  = fmtShort(totale);
-  document.getElementById('kpiPicco').textContent   = flusso[piccoIdx]?.label || '—';
 
-  // Grafico principale
-  const labels   = flusso.map(r => r.label);
-  const mensili  = flusso.map(r => +r.totale.toFixed(2));
-  const cumulati = flusso.map(r => +r.cumulato.toFixed(2));
+  const labels          = flusso.map(r => r.label);
+  const lordiMensili    = flusso.map(r => +r.lordo.toFixed(2));
+  const provvMensili    = flusso.map(r => +r.provv.toFixed(2));
+  const cumulatiNetti   = flusso.map(r => +r.cumulato.toFixed(2));
   const nClientiPerMese = flusso.map(r => r.nClienti);
 
   const cfgBase = {
     responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { mode:'index', intersect:false,
-      callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + fmt(ctx.raw) }
-    }},
+    plugins: { legend: { display: false }, tooltip: { mode:'index', intersect:false } },
     scales: {
-      x: { ticks:{ color:'#8b949e', font:{size:10}, maxRotation:45 }, grid:{ color:'rgba(255,255,255,.04)' } },
+      x: { ticks:{ color:'#8b949e', font:{size:10}, maxRotation:45 }, grid:{ color:'rgba(255,255,255,.04)' } }
     }
   };
 
@@ -179,16 +179,24 @@ function aggiorna() {
       labels,
       datasets: [
         {
-          type: 'bar', label: 'Cash flow mensile',
-          data: mensili,
+          type: 'bar', label: 'M. Lordo',
+          data: lordiMensili,
           backgroundColor: 'rgba(124,157,255,0.35)',
           borderColor: 'rgba(124,157,255,0.8)',
+          borderWidth: 1, borderRadius: 4,
+          yAxisID: 'yMensile', order: 3
+        },
+        {
+          type: 'bar', label: 'Provvigioni',
+          data: provvMensili,
+          backgroundColor: 'rgba(245,158,11,0.35)',
+          borderColor: 'rgba(245,158,11,0.8)',
           borderWidth: 1, borderRadius: 4,
           yAxisID: 'yMensile', order: 2
         },
         {
-          type: 'line', label: 'Cumulato',
-          data: cumulati,
+          type: 'line', label: 'M. Netto cumulato',
+          data: cumulatiNetti,
           borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)',
           borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 4,
           fill: true, tension: 0.3,
@@ -203,18 +211,12 @@ function aggiorna() {
         yMensile:  { position:'left',  ticks:{ color:'#7c9dff', font:{size:10}, callback: v => fmtShort(v) }, grid:{ color:'rgba(255,255,255,.04)' } },
         yCumulato: { position:'right', ticks:{ color:'#10b981', font:{size:10}, callback: v => fmtShort(v) }, grid:{ display:false } }
       },
-      plugins: { ...cfgBase.plugins, tooltip: { ...cfgBase.plugins.tooltip,
-        callbacks: {
-          label: ctx => {
-            const pfx = ctx.dataset.yAxisID === 'yCumulato' ? 'Cumulato' : 'Mensile';
-            return ' ' + pfx + ': ' + fmt(ctx.raw);
-          }
-        }
+      plugins: { ...cfgBase.plugins, tooltip: { mode:'index', intersect:false,
+        callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + fmt(ctx.raw) }
       }}
     }
   });
 
-  // Grafico clienti attivi
   if (chartClienti) chartClienti.destroy();
   chartClienti = new Chart(document.getElementById('chartClienti'), {
     type: 'line',
@@ -225,8 +227,7 @@ function aggiorna() {
         data: nClientiPerMese,
         borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)',
         borderWidth: 2, pointRadius: 2, pointHoverRadius: 5,
-        fill: true, tension: 0.3,
-        stepped: false
+        fill: true, tension: 0.3
       }]
     },
     options: {
@@ -235,35 +236,28 @@ function aggiorna() {
         ...cfgBase.scales,
         y: { ticks:{ color:'#8b949e', font:{size:10}, stepSize:1 }, grid:{ color:'rgba(255,255,255,.04)' } }
       },
-      plugins: { ...cfgBase.plugins, tooltip: { ...cfgBase.plugins.tooltip,
+      plugins: { ...cfgBase.plugins, tooltip: { mode:'index', intersect:false,
         callbacks: { label: ctx => ' Clienti attivi: ' + ctx.raw }
       }}
     }
   });
 
-  // Tabella
   const tbody = document.getElementById('tblFlussoBody');
   tbody.innerHTML = '';
   flusso.forEach((r, i) => {
-    const prev = i > 0 ? flusso[i-1].totale : r.totale;
-    const delta = r.totale - prev;
-    const deltaHtml = i === 0
-      ? '<span style="color:var(--text3)">—</span>'
-      : delta >= 0
-        ? `<span style="color:#10b981">▲ ${fmtShort(Math.abs(delta))}</span>`
-        : `<span style="color:#ef4444">▼ ${fmtShort(Math.abs(delta))}</span>`;
     const isOdd = i % 2 === 0;
-    tbody.insertAdjacentHTML('beforeend', `
-      <tr style="border-bottom:1px solid var(--border);${isOdd ? 'background:var(--bg3)' : ''}">
-        <td style="padding:9px 12px;font-size:12px;font-weight:600;color:var(--text1)">${r.label}</td>
-        <td style="padding:9px 12px;text-align:right;font-size:12px;color:var(--text2)">${r.nClienti}</td>
-        <td style="padding:9px 12px;text-align:right;font-size:12px;color:#7c9dff;font-family:var(--mono)">${fmt(r.totale)}</td>
-        <td style="padding:9px 12px;text-align:right;font-size:12px;color:#10b981;font-family:var(--mono)">${fmt(r.cumulato)}</td>
-        <td style="padding:9px 12px;font-size:12px">${deltaHtml}</td>
-      </tr>`);
+    tbody.insertAdjacentHTML('beforeend',
+      '<tr style="border-bottom:1px solid var(--border);' + (isOdd ? 'background:var(--bg3)' : '') + '">' +
+      '<td style="padding:9px 12px;font-size:12px;font-weight:600;color:var(--text1)">' + r.label + '</td>' +
+      '<td style="padding:9px 12px;text-align:right;font-size:12px;color:var(--text2)">' + r.nClienti + '</td>' +
+      '<td style="padding:9px 12px;text-align:right;font-size:12px;color:#7c9dff;font-family:var(--mono)">' + fmt(r.lordo) + '</td>' +
+      '<td style="padding:9px 12px;text-align:right;font-size:12px;color:#f59e0b;font-family:var(--mono)">' + fmt(r.provv) + '</td>' +
+      '<td style="padding:9px 12px;text-align:right;font-size:12px;color:#10b981;font-family:var(--mono)">' + fmt(r.netto) + '</td>' +
+      '<td style="padding:9px 12px;text-align:right;font-size:12px;color:#10b981;font-family:var(--mono);font-weight:600">' + fmt(r.cumulato) + '</td>' +
+      '</tr>'
+    );
   });
 
-  // Dettaglio per cliente
   const div = document.getElementById('clientiDettagli');
   const conData = CLIENTI.filter(c => c.data_inizio_fornitura)
     .sort((a,b) => (b.margine_netto||0) - (a.margine_netto||0));
@@ -272,35 +266,27 @@ function aggiorna() {
     return;
   }
   div.innerHTML = conData.map(c => {
-    const mensile = ((c.margine_netto || 0) / 12);
+    const mensileNetto = (c.margine_netto      || 0) / 12;
+    const mensileProvv = (c.totale_provvigioni || 0) / 12;
     const badge = c.commodity === 'LUCE'
-      ? '<span class="badge badge-orange" style="font-size:10px">🔆 Luce</span>'
-      : '<span class="badge badge-blue" style="font-size:10px">🔥 Gas</span>';
+      ? '<span class="badge badge-orange" style="font-size:10px">Luce</span>'
+      : '<span class="badge badge-blue" style="font-size:10px">Gas</span>';
     const inizio = c.data_inizio_fornitura || '—';
     const fine   = c.data_switch_out || 'in corso';
-    const pod    = c.pod_pdr ? `<span style="color:var(--text3);font-size:10px;margin-left:6px">${c.pod_pdr}</span>` : '';
-    return `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-          ${badge}
-          <span style="font-weight:600;font-size:13px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.nome_cliente || '—'}</span>
-          ${pod}
-        </div>
-        <div style="display:flex;gap:24px;align-items:center;flex-shrink:0;margin-left:12px">
-          <div style="text-align:right">
-            <div style="font-size:10px;color:var(--text3)">Mensile</div>
-            <div style="font-size:13px;font-family:var(--mono);color:#7c9dff">${fmt(mensile)}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:10px;color:var(--text3)">Annuo</div>
-            <div style="font-size:13px;font-family:var(--mono);color:#10b981">${fmt(c.margine_netto||0)}</div>
-          </div>
-          <div style="text-align:right;min-width:90px">
-            <div style="font-size:10px;color:var(--text3)">Periodo</div>
-            <div style="font-size:11px;color:var(--text2)">${inizio} → ${fine}</div>
-          </div>
-        </div>
-      </div>`;
+    const pod    = c.pod_pdr ? '<span style="color:var(--text3);font-size:10px;margin-left:6px">' + c.pod_pdr + '</span>' : '';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg3);border-radius:8px;border:1px solid var(--border);margin-bottom:6px">' +
+      '<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">' +
+        badge +
+        '<span style="font-weight:600;font-size:13px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (c.nome_cliente || '—') + '</span>' +
+        pod +
+      '</div>' +
+      '<div style="display:flex;gap:20px;align-items:center;flex-shrink:0;margin-left:12px">' +
+        '<div style="text-align:right"><div style="font-size:10px;color:var(--text3)">Provv./mese</div><div style="font-size:13px;font-family:var(--mono);color:#f59e0b">' + fmt(mensileProvv) + '</div></div>' +
+        '<div style="text-align:right"><div style="font-size:10px;color:var(--text3)">Netto/mese</div><div style="font-size:13px;font-family:var(--mono);color:#7c9dff">' + fmt(mensileNetto) + '</div></div>' +
+        '<div style="text-align:right"><div style="font-size:10px;color:var(--text3)">Netto annuo</div><div style="font-size:13px;font-family:var(--mono);color:#10b981">' + fmt(c.margine_netto||0) + '</div></div>' +
+        '<div style="text-align:right;min-width:90px"><div style="font-size:10px;color:var(--text3)">Periodo</div><div style="font-size:11px;color:var(--text2)">' + inizio + ' → ' + fine + '</div></div>' +
+      '</div>' +
+    '</div>';
   }).join('');
 }
 
