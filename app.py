@@ -2050,22 +2050,28 @@ def portafoglio_ricalcola(pf_id):
             'SELECT * FROM clienti_portafoglio WHERE portafoglio_id=?', (pf_id,)
         ).fetchall()
     aggiornati = 0
+    updates = []
     for c in clienti:
         if c['offerta_id'] and c['piano_id']:
             r = _calcola_cliente(c['offerta_id'], c['piano_id'], c['consumo_override'])
             if r:
-                with get_db() as db:
-                    db.execute('''UPDATE clienti_portafoglio SET
-                        nome_offerta=?,nome_fornitore=?,nome_piano=?,commodity=?,
-                        spread_vendita=?,spread_acquisto=?,quota_fissa=?,costo_gestione_pdp=?,
-                        margine_lordo=?,totale_provvigioni=?,margine_netto=?,margine_percentuale=?
-                        WHERE id=?''',
-                        (r['nome_offerta'],r['nome_fornitore'],r['nome_piano'],r['commodity'],
-                         r['spread_vendita'],r['spread_acquisto'],r['quota_fissa'],r['costo_gestione_pdp'],
-                         r['margine_lordo'],r['totale_provvigioni'],r['margine_netto'],r['margine_percentuale'],
-                         c['id']))
-                    db.commit()
-                aggiornati += 1
+                updates.append((
+                    r['nome_offerta'], r['nome_fornitore'], r['nome_piano'], r['commodity'],
+                    r.get('tipo_consumo', ''),
+                    r['spread_vendita'], r['spread_acquisto'], r['quota_fissa'], r['costo_gestione_pdp'],
+                    r['margine_lordo'], r['totale_provvigioni'], r['margine_netto'], r['margine_percentuale'],
+                    c['id']
+                ))
+    if updates:
+        with get_db() as db:
+            for vals in updates:
+                db.execute('''UPDATE clienti_portafoglio SET
+                    nome_offerta=?,nome_fornitore=?,nome_piano=?,commodity=?,tipo_consumo=?,
+                    spread_vendita=?,spread_acquisto=?,quota_fissa=?,costo_gestione_pdp=?,
+                    margine_lordo=?,totale_provvigioni=?,margine_netto=?,margine_percentuale=?
+                    WHERE id=?''', vals)
+            db.commit()
+        aggiornati = len(updates)
     flash(f'Ricalcolo completato: {aggiornati} clienti aggiornati.', 'success')
     return redirect(url_for('portafoglio_dettaglio', pf_id=pf_id))
 
@@ -3122,9 +3128,9 @@ def export_confronto_pdf():
     # Tabella provvigioni - con tutti i dettagli
     prov_data = [
         [Paragraph('PROVVIGIONI', header_style), Paragraph('VALORE (€/smc)', header_style), Paragraph('TOTALE (€)', header_style)],
-        ['Agente', f"{sa.get('prov_agente', 0):.2f}", f"{sa.get('prov_agente', 0) * consumo:.2f}"],
-        ['Sub-Agente', f"{sa.get('prov_sub_agente', 0):.2f}", f"{sa.get('prov_sub_agente', 0) * consumo:.2f}"],
-        ['Area Manager', f"{sa.get('prov_area_manager', 0):.2f}", f"{sa.get('prov_area_manager', 0) * consumo:.2f}"],
+        ['Agente', f"{sa.get('provvigione_agente', 0):.2f}", f"{sa.get('provvigione_agente', 0) * consumo:.2f}"],
+        ['Sub-Agente', f"{sa.get('provvigione_sub_agente', 0):.2f}", f"{sa.get('provvigione_sub_agente', 0) * consumo:.2f}"],
+        ['Area Manager', f"{sa.get('provvigione_area_manager', 0):.2f}", f"{sa.get('provvigione_area_manager', 0) * consumo:.2f}"],
         ['TOTALE', '', f"{sa.get('totale_provvigioni', 0):.2f}"],
     ]
 
