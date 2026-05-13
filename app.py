@@ -3403,6 +3403,394 @@ def api_agenti_tree():
     return jsonify(roots)
 
 
+# ── Prospetto Cliente ─────────────────────────────────────────────────────────
+
+def _calcola_prospetto(form):
+    """Estrae e calcola i dati del prospetto da un dict-like (request.form)."""
+    def _f(key):
+        try:
+            return float(form.get(key) or 0)
+        except (ValueError, TypeError):
+            return 0.0
+
+    consumo_annuo      = _f('consumo_annuo')
+    spread_attuale     = _f('spread_attuale')
+    quota_fissa_attuale = _f('quota_fissa_attuale')
+
+    voci = []
+    for i in range(50):
+        nome_v  = (form.get(f'voce_nome_{i}') or '').strip()
+        euro_vs = (form.get(f'voce_euro_{i}') or '').strip()
+        if not nome_v and not euro_vs:
+            continue
+        try:
+            euro_v = float(euro_vs) if euro_vs else 0.0
+        except ValueError:
+            euro_v = 0.0
+        voci.append({'nome': nome_v or '—', 'euro_mese': euro_v})
+
+    costo_spread_att = spread_attuale * consumo_annuo
+    costo_qf_att     = quota_fissa_attuale * 12
+    costo_voci       = sum(v['euro_mese'] * 12 for v in voci)
+    totale_att       = costo_spread_att + costo_qf_att + costo_voci
+
+    return {
+        'nome_cliente':           (form.get('nome_cliente') or '').strip(),
+        'indirizzo_cliente':      (form.get('indirizzo_cliente') or '').strip(),
+        'commodity':              form.get('commodity') or 'LUCE',
+        'consumo_annuo':          consumo_annuo,
+        'nome_fornitore_attuale': (form.get('nome_fornitore_attuale') or '').strip(),
+        'spread_attuale':         spread_attuale,
+        'quota_fissa_attuale':    quota_fissa_attuale,
+        'voci':                   voci,
+        'costo_spread_att':       costo_spread_att,
+        'costo_qf_att':           costo_qf_att,
+        'costo_voci':             costo_voci,
+        'totale_att':             totale_att,
+    }
+
+
+@app.route('/prospetto', methods=['GET', 'POST'])
+@login_required
+def prospetto():
+    aw, ap   = uid_where()
+    anda, andp = uid_and()
+    with get_db() as db:
+        offerte_rows = db.execute(
+            f'SELECT * FROM offerte {aw} {"AND" if aw else "WHERE"} stato="ATTIVA"'
+            ' ORDER BY commodity, nome_offerta', ap
+        ).fetchall()
+    offerte = [dict(o) for o in offerte_rows]
+
+    risultato = None
+    form_data = {}
+
+    if request.method == 'POST':
+        d = _calcola_prospetto(request.form)
+        offerta_id = request.form.get('offerta_id', type=int)
+        offerta_sel = None
+        if offerta_id:
+            with get_db() as db:
+                row = db.execute(f'SELECT * FROM offerte WHERE id=? {anda}',
+                                 [offerta_id] + andp).fetchone()
+            if row:
+                offerta_sel = dict(row)
+
+        if offerta_sel and d['consumo_annuo'] > 0:
+            spread_n      = float(offerta_sel.get('spread') or 0)
+            qf_n          = float(offerta_sel.get('quota_fissa') or 0)
+            costo_spread_n = spread_n * d['consumo_annuo']
+            costo_qf_n    = qf_n * 12
+            totale_n      = costo_spread_n + costo_qf_n
+
+            risp_spread = d['costo_spread_att'] - costo_spread_n
+            risp_qf     = d['costo_qf_att']     - costo_qf_n
+            risp_voci   = d['costo_voci']
+            risp_tot    = risp_spread + risp_qf + risp_voci
+
+            risultato = {
+                **d,
+                'offerta':       offerta_sel,
+                'offerta_id':    offerta_id,
+                'spread_n':      spread_n,
+                'qf_n':          qf_n,
+                'costo_spread_n': costo_spread_n,
+                'costo_qf_n':    costo_qf_n,
+                'totale_n':      totale_n,
+                'risp_spread':   risp_spread,
+                'risp_qf':       risp_qf,
+                'risp_voci':     risp_voci,
+                'risp_tot':      risp_tot,
+                'risp_mensile':  risp_tot / 12,
+                'risp_pct':      (risp_tot / d['totale_att'] * 100) if d['totale_att'] > 0 else 0,
+            }
+
+        form_data = {**d, 'offerta_id': offerta_id}
+
+    return render_template('prospetto.html',
+                           offerte=offerte,
+                           risultato=risultato,
+                           form_data=form_data)
+
+
+@app.route('/export/prospetto-pdf', methods=['POST'])
+@login_required
+def export_prospetto_pdf():
+    anda, andp = uid_and()
+    d = _calcola_prospetto(request.form)
+    offerta_id = request.form.get('offerta_id', type=int)
+    offerta_sel = None
+    if offerta_id:
+        with get_db() as db:
+            row = db.execute(f'SELECT * FROM offerte WHERE id=? {anda}',
+                             [offerta_id] + andp).fetchone()
+        if row:
+            offerta_sel = dict(row)
+
+    if not offerta_sel or d['consumo_annuo'] <= 0:
+        abort(400)
+
+    spread_n       = float(offerta_sel.get('spread') or 0)
+    qf_n           = float(offerta_sel.get('quota_fissa') or 0)
+    costo_spread_n = spread_n * d['consumo_annuo']
+    costo_qf_n     = qf_n * 12
+    totale_n       = costo_spread_n + costo_qf_n
+    risp_spread    = d['costo_spread_att'] - costo_spread_n
+    risp_qf        = d['costo_qf_att']     - costo_qf_n
+    risp_voci      = d['costo_voci']
+    risp_tot       = risp_spread + risp_qf + risp_voci
+    risp_mensile   = risp_tot / 12
+    risp_pct       = (risp_tot / d['totale_att'] * 100) if d['totale_att'] > 0 else 0
+    unit           = 'MWh' if d['commodity'] == 'LUCE' else 'Smc'
+
+    # ── Palette ──────────────────────────────────────────────────────────────
+    C_WHITE  = colors.white
+    C_BG     = colors.HexColor('#F8FAFC')
+    C_DARK   = colors.HexColor('#0F172A')
+    C_GRAY   = colors.HexColor('#64748B')
+    C_LGRAY  = colors.HexColor('#E2E8F0')
+    C_DGRAY  = colors.HexColor('#475569')
+    C_RED    = colors.HexColor('#DC2626')
+    C_REDL   = colors.HexColor('#FFF1F1')
+    C_REDB   = colors.HexColor('#FCA5A5')
+    C_GREEN  = colors.HexColor('#059669')
+    C_GREENL = colors.HexColor('#ECFDF5')
+    C_AMBL   = colors.HexColor('#FFFBEB')
+    C_AMBB   = colors.HexColor('#D97706')
+
+    def S(name, **kw):
+        return ParagraphStyle(name, **kw)
+
+    TITLE_S  = S('t',  fontName='Helvetica-Bold', fontSize=22, textColor=C_DARK, leading=28)
+    SUB_S    = S('s',  fontName='Helvetica',      fontSize=11, textColor=C_GRAY, leading=15)
+    TINY_S   = S('ti', fontName='Helvetica',      fontSize=8,  textColor=C_GRAY, leading=11)
+    SEC_S    = S('se', fontName='Helvetica-Bold', fontSize=11, textColor=C_WHITE, leading=15)
+    LBL_S    = S('l',  fontName='Helvetica',      fontSize=10, textColor=C_DGRAY, leading=14)
+    VAL_S    = S('v',  fontName='Helvetica-Bold', fontSize=10, textColor=C_DARK,  leading=14)
+    VAL_R_S  = S('vr', fontName='Helvetica-Bold', fontSize=10, textColor=C_DARK,  leading=14, alignment=2)
+    RED_S    = S('r',  fontName='Helvetica-Bold', fontSize=10, textColor=C_RED,   leading=14)
+    RED_D_S  = S('rd', fontName='Helvetica',      fontSize=8,  textColor=C_RED,   leading=11)
+    GRN_S    = S('g',  fontName='Helvetica-Bold', fontSize=10, textColor=C_GREEN, leading=14)
+    WHT_S    = S('w',  fontName='Helvetica-Bold', fontSize=10, textColor=C_WHITE, leading=14)
+    WHT_R_S  = S('wr', fontName='Helvetica-Bold', fontSize=11, textColor=C_WHITE, leading=14, alignment=2)
+    BIG_S    = S('b',  fontName='Helvetica-Bold', fontSize=13, textColor=C_GREEN, leading=18, alignment=1)
+    BVAL_S   = S('bv', fontName='Helvetica-Bold', fontSize=28, textColor=C_GREEN, leading=36, alignment=2)
+    DSUB_S   = S('ds', fontName='Helvetica',      fontSize=8,  textColor=C_GRAY,  leading=11)
+
+    buf = io.BytesIO()
+    W   = A4[0] - 4 * cm
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            leftMargin=2*cm, rightMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+    story = []
+
+    def fmt(v):
+        s = f'{float(v):,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+        return f'€ {s}'
+
+    def sec_hdr(title, bg):
+        t = Table([[Paragraph(title, SEC_S)]], colWidths=[W])
+        t.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0), (-1,-1), bg),
+            ('LEFTPADDING',   (0,0), (-1,-1), 10),
+            ('TOPPADDING',    (0,0), (-1,-1), 7),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+        ]))
+        return t
+
+    # ── Logo + titolo ─────────────────────────────────────────────────────────
+    logo_path = os.path.join(os.path.dirname(__file__), 'static', 'img', 'uflow-logo.png')
+    if os.path.exists(logo_path):
+        logo = Image(logo_path, width=3*cm, height=1.2*cm)
+        logo.hAlign = 'LEFT'
+        story.append(logo)
+        story.append(Spacer(1, 0.3*cm))
+
+    story.append(Paragraph('Analisi di Risparmio', TITLE_S))
+    story.append(Spacer(1, 0.1*cm))
+    cliente_str = d['nome_cliente'] or 'Cliente'
+    if d['indirizzo_cliente']:
+        cliente_str += f' — {d["indirizzo_cliente"]}'
+    story.append(Paragraph(f'Preparata per: <b>{cliente_str}</b>', SUB_S))
+    story.append(Paragraph(
+        f'Commodity: {d["commodity"]} · Consumo annuo: {d["consumo_annuo"]:,.0f} {unit} · Data: {datetime.now().strftime("%d/%m/%Y")}',
+        TINY_S))
+    story.append(Spacer(1, 0.4*cm))
+    story.append(HRFlowable(width=W, color=C_LGRAY, thickness=1))
+    story.append(Spacer(1, 0.45*cm))
+
+    CW = [W * 0.36, W * 0.37, W * 0.27]
+    HDR_ROW_STYLE = [
+        ('BACKGROUND',    (0,0), (-1,0), C_LGRAY),
+        ('FONTNAME',      (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE',      (0,0), (-1,-1), 9),
+        ('ALIGN',         (2,0), (2,-1), 'RIGHT'),
+        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING',    (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING',   (0,0), (-1,-1), 8),
+        ('RIGHTPADDING',  (0,0), (-1,-1), 8),
+        ('LINEBELOW',     (0,0), (-1,-2), 0.5, C_LGRAY),
+    ]
+
+    def hdr_cols(labels):
+        return [Paragraph(lbl, S(f'hc{i}', fontName='Helvetica-Bold', fontSize=9,
+                                 textColor=C_GRAY, leading=12,
+                                 alignment=(2 if i == 2 else 0)))
+                for i, lbl in enumerate(labels)]
+
+    # ── SEZIONE 1: fornitore attuale ──────────────────────────────────────────
+    story.append(sec_hdr(
+        f'▸  Contratto attuale — {d["nome_fornitore_attuale"] or "fornitore corrente"}',
+        C_DGRAY))
+    story.append(Spacer(1, 0.2*cm))
+
+    att_rows = [
+        hdr_cols(['Voce di costo', 'Dettaglio', 'Costo annuo']),
+        [Paragraph('Energia — spread commerciale', LBL_S),
+         Paragraph(f'{d["spread_attuale"]:+.4f} €/{unit} × {d["consumo_annuo"]:,.0f} {unit}', LBL_S),
+         Paragraph(fmt(d['costo_spread_att']), VAL_R_S)],
+        [Paragraph('Quota fissa mensile', LBL_S),
+         Paragraph(f'{fmt(d["quota_fissa_attuale"])}/mese × 12', LBL_S),
+         Paragraph(fmt(d['costo_qf_att']), VAL_R_S)],
+    ]
+    for v in d['voci']:
+        att_rows.append([
+            Paragraph(f'<font color="#DC2626">⚠ <b>{v["nome"]}</b></font>', RED_S),
+            Paragraph(f'<font color="#DC2626">{fmt(v["euro_mese"])}/mese × 12 — voce non trasparente</font>',
+                      RED_D_S),
+            Paragraph(fmt(v['euro_mese'] * 12),
+                      S('rv', fontName='Helvetica-Bold', fontSize=10, textColor=C_RED, leading=14, alignment=2)),
+        ])
+    att_rows.append([
+        Paragraph('<b>TOTALE ANNUO STIMATO</b>', WHT_S),
+        Paragraph('', LBL_S),
+        Paragraph(f'<b>{fmt(d["totale_att"])}</b>', WHT_R_S),
+    ])
+
+    att_style = list(HDR_ROW_STYLE) + [
+        ('BACKGROUND',    (0,-1), (-1,-1), C_DGRAY),
+        ('ROWBACKGROUNDS',(0,1),  (-1,-2), [C_WHITE, C_BG]),
+    ]
+    for ri in range(3, 3 + len(d['voci'])):
+        att_style.append(('BACKGROUND', (0, ri), (-1, ri), C_REDL))
+
+    att_t = Table(att_rows, colWidths=CW, repeatRows=1)
+    att_t.setStyle(TableStyle(att_style))
+    story.append(att_t)
+    story.append(Spacer(1, 0.5*cm))
+
+    # ── SEZIONE 2: nuova offerta ──────────────────────────────────────────────
+    story.append(sec_hdr(
+        f'✓  La nostra proposta — {offerta_sel.get("nome_offerta", "")}',
+        C_GREEN))
+    story.append(Spacer(1, 0.2*cm))
+
+    new_rows = [
+        hdr_cols(['Voce di costo', 'Dettaglio', 'Costo annuo']),
+        [Paragraph('Energia — spread commerciale', LBL_S),
+         Paragraph(f'{spread_n:+.4f} €/{unit} × {d["consumo_annuo"]:,.0f} {unit}', LBL_S),
+         Paragraph(fmt(costo_spread_n), VAL_R_S)],
+        [Paragraph('Quota fissa mensile', LBL_S),
+         Paragraph(f'{fmt(qf_n)}/mese × 12', LBL_S),
+         Paragraph(fmt(costo_qf_n), VAL_R_S)],
+        [Paragraph('<font color="#059669">Nessuna voce aggiuntiva nascosta</font>', GRN_S),
+         Paragraph('<font color="#059669">Prezzo tutto incluso e trasparente</font>',
+                   S('gd', fontName='Helvetica', fontSize=9, textColor=C_GREEN, leading=12)),
+         Paragraph('<font color="#059669">€ 0,00</font>',
+                   S('gv', fontName='Helvetica-Bold', fontSize=10, textColor=C_GREEN, leading=14, alignment=2))],
+        [Paragraph('<b>TOTALE ANNUO STIMATO</b>', WHT_S),
+         Paragraph('', LBL_S),
+         Paragraph(f'<b>{fmt(totale_n)}</b>', WHT_R_S)],
+    ]
+    new_t = Table(new_rows, colWidths=CW, repeatRows=1)
+    new_t.setStyle(TableStyle(list(HDR_ROW_STYLE) + [
+        ('BACKGROUND',    (0,-1), (-1,-1), C_GREEN),
+        ('BACKGROUND',    (0,3),  (-1,3),  C_GREENL),
+        ('ROWBACKGROUNDS',(0,1),  (-1,2),  [C_WHITE, C_BG]),
+    ]))
+    story.append(new_t)
+    story.append(Spacer(1, 0.5*cm))
+
+    # ── SEZIONE 3: risparmio ──────────────────────────────────────────────────
+    risp_box = Table(
+        [[Paragraph('RISPARMIO STIMATO ANNUO', BIG_S),
+          Paragraph(fmt(risp_tot), BVAL_S)]],
+        colWidths=[W * 0.58, W * 0.42])
+    risp_box.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,-1), C_GREENL),
+        ('LINEABOVE',     (0,0), (-1,0),  2, C_GREEN),
+        ('LINEBELOW',     (0,-1),(-1,-1), 2, C_GREEN),
+        ('LINEBEFORE',    (0,0), (0,-1),  2, C_GREEN),
+        ('LINEAFTER',     (-1,0),(-1,-1), 2, C_GREEN),
+        ('VALIGN',        (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING',    (0,0), (-1,-1), 14),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 14),
+        ('LEFTPADDING',   (0,0), (-1,-1), 14),
+        ('RIGHTPADDING',  (0,0), (-1,-1), 14),
+    ]))
+    story.append(risp_box)
+    story.append(Spacer(1, 0.3*cm))
+
+    CW2 = [W * 0.44, W * 0.28, W * 0.28]
+    ALTR = S('ar', fontName='Helvetica-Bold', fontSize=10, leading=14, alignment=2)
+
+    def risp_val(v):
+        col = '#059669' if v >= 0 else '#DC2626'
+        return Paragraph(f'<font color="{col}"><b>{fmt(v)}</b></font>', ALTR)
+
+    def risp_mese(v):
+        return Paragraph(fmt(v), S('rm', fontName='Helvetica', fontSize=9,
+                                   textColor=C_GRAY, leading=12, alignment=2))
+
+    br_rows = [
+        hdr_cols(['Componente risparmio', 'Risparmio annuo', 'Risparmio mensile']),
+        [Paragraph('Su energia (spread)', LBL_S), risp_val(risp_spread), risp_mese(risp_spread/12)],
+        [Paragraph('Su quota fissa mensile', LBL_S), risp_val(risp_qf), risp_mese(risp_qf/12)],
+    ]
+    if risp_voci > 0:
+        br_rows.append([
+            Paragraph('<font color="#D97706"><b>⚠ Voci nascoste eliminate</b></font>',
+                      S('vn', fontName='Helvetica-Bold', fontSize=10, textColor=C_AMBB, leading=14)),
+            risp_val(risp_voci),
+            risp_mese(risp_voci / 12),
+        ])
+    br_rows.append([
+        Paragraph(f'<b>TOTALE  ({risp_pct:.1f}% del costo attuale)</b>', WHT_S),
+        Paragraph(f'<b>{fmt(risp_tot)}</b>',
+                  S('btv', fontName='Helvetica-Bold', fontSize=11, textColor=C_WHITE, leading=14, alignment=2)),
+        Paragraph(f'<b>{fmt(risp_mensile)}/mese</b>',
+                  S('btm', fontName='Helvetica-Bold', fontSize=10, textColor=C_WHITE, leading=14, alignment=2)),
+    ])
+
+    br_style = list(HDR_ROW_STYLE) + [
+        ('BACKGROUND',    (0,-1), (-1,-1), C_GREEN),
+        ('ROWBACKGROUNDS',(0,1),  (-1,-2), [C_WHITE, C_BG]),
+    ]
+    if risp_voci > 0:
+        br_style.append(('BACKGROUND', (0, len(br_rows)-2), (-1, len(br_rows)-2), C_AMBL))
+
+    br_t = Table(br_rows, colWidths=CW2, repeatRows=1)
+    br_t.setStyle(TableStyle(br_style))
+    story.append(br_t)
+    story.append(Spacer(1, 0.5*cm))
+
+    # ── Disclaimer ────────────────────────────────────────────────────────────
+    story.append(HRFlowable(width=W, color=C_LGRAY, thickness=0.5))
+    story.append(Spacer(1, 0.15*cm))
+    story.append(Paragraph(
+        'Le stime sono calcolate sui parametri contrattuali forniti (spread, quota fissa, voci aggiuntive) '
+        'applicati al consumo annuo indicato. Non includono componenti di rete, oneri di sistema e accise, '
+        'invariate indipendentemente dal fornitore. Il risparmio effettivo potrà variare in funzione dei consumi reali.',
+        DSUB_S))
+
+    doc.build(story)
+    buf.seek(0)
+    safe_name = (d['nome_cliente'] or 'cliente').replace(' ', '_').replace('/', '-')
+    fname = f"prospetto_{safe_name}_{datetime.now().strftime('%Y%m%d')}.pdf"
+    return send_file(buf, as_attachment=True, download_name=fname, mimetype='application/pdf')
+
+
 if __name__ == '__main__':
     print('\n✅ Energia Simulator avviato!')
     print('📌 Apri il browser su: http://127.0.0.1:5000\n')

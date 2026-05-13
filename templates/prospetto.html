@@ -1,0 +1,433 @@
+{% extends 'base.html' %}
+{% block title %}Prospetto Cliente | UFLOW{% endblock %}
+
+{% block content %}
+<style>
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.pros-wrap{max-width:860px;margin:0 auto}
+.pros-page-hdr{display:flex;align-items:flex-start;gap:12px;margin-bottom:1.5rem}
+.pros-page-icon{font-size:1.6rem;line-height:1}
+.pros-page-hdr h1{font-size:1.3rem;font-weight:700;margin:0}
+.pros-page-sub{font-size:.82rem;color:var(--text3);margin-top:3px}
+
+/* ── Cards ──────────────────────────────────────────────────────────────── */
+.pros-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1rem}
+.pros-card-hdr{display:flex;align-items:center;gap:8px;padding:11px 15px;border-bottom:1px solid var(--border);font-weight:600;font-size:.88rem;color:var(--text2)}
+.pros-card-hdr-red {border-left:3px solid var(--red)}
+.pros-card-hdr-green{border-left:3px solid var(--green)}
+.pros-card-body{padding:15px}
+
+/* ── Form ───────────────────────────────────────────────────────────────── */
+.pros-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.pros-group{flex:1;min-width:150px;display:flex;flex-direction:column;gap:4px}
+.pros-label{font-size:.78rem;color:var(--text3);font-weight:500}
+.pros-input{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:8px 10px;color:var(--text);font-size:.88rem;font-family:var(--font);width:100%}
+.pros-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(16,185,129,.15)}
+select.pros-input{cursor:pointer}
+.pros-badge{display:inline-block;padding:2px 7px;background:var(--bg4);border:1px solid var(--border3);border-radius:99px;font-size:.73rem;color:var(--text3);margin-left:4px;vertical-align:middle}
+
+/* ── Voci nascoste ───────────────────────────────────────────────────────── */
+.voci-box{margin-top:12px;background:rgba(239,68,68,.05);border:1px dashed rgba(239,68,68,.28);border-radius:var(--radius-sm);padding:13px}
+.voci-box-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+.voci-box-title{font-size:.84rem;font-weight:600;color:var(--red)}
+.voci-box-hint{font-size:.74rem;color:var(--text4)}
+.voce-row{display:flex;gap:8px;align-items:center;margin-bottom:7px}
+.voce-row .pros-input{background:var(--bg2)}
+.voce-amt{display:flex;align-items:center;gap:5px;width:160px;flex-shrink:0}
+.voce-unit{font-size:.78rem;color:var(--text3);white-space:nowrap}
+.btn-del-voce{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);border-radius:var(--radius-sm);color:var(--red);padding:6px 10px;cursor:pointer;font-size:.82rem;flex-shrink:0;line-height:1}
+.btn-del-voce:hover{background:rgba(239,68,68,.25)}
+.btn-add-voce{background:rgba(239,68,68,.06);border:1px dashed rgba(239,68,68,.35);border-radius:var(--radius-sm);color:var(--red);padding:7px 14px;cursor:pointer;font-size:.81rem;width:100%;margin-top:3px;text-align:center}
+.btn-add-voce:hover{background:rgba(239,68,68,.14)}
+
+/* ── Submit ──────────────────────────────────────────────────────────────── */
+.pros-actions{display:flex;justify-content:flex-end;margin-bottom:1.5rem}
+.btn-calc{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:10px 26px;font-weight:600;font-size:.9rem;cursor:pointer;font-family:var(--font)}
+.btn-calc:hover{background:var(--accent2)}
+
+/* ── Risultato ───────────────────────────────────────────────────────────── */
+.ris-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:1.5rem}
+.ris-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.ris-top h2{font-size:1.05rem;font-weight:600;color:var(--text);margin:0}
+.btn-pdf{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red);padding:8px 16px;border-radius:var(--radius-sm);font-weight:600;font-size:.84rem;cursor:pointer;font-family:var(--font)}
+.btn-pdf:hover{background:rgba(239,68,68,.22)}
+
+/* ── Confronto colonne ───────────────────────────────────────────────────── */
+.conf-cols{display:grid;grid-template-columns:1fr 96px 1fr;gap:10px;margin-bottom:14px}
+.col-att{background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.18);border-radius:var(--radius);padding:13px}
+.col-nuova{background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.18);border-radius:var(--radius);padding:13px}
+
+.col-title{font-weight:700;font-size:.87rem;padding-bottom:9px;border-bottom:1px solid var(--border);margin-bottom:8px}
+.col-title-red{color:var(--red)}
+.col-title-green{color:var(--green)}
+
+.cost-row{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0}
+.cost-lbl{font-size:.83rem;color:var(--text2)}
+.cost-val{font-weight:600;font-size:.87rem;color:var(--text);white-space:nowrap}
+.cost-detail{padding:1px 0 7px;border-bottom:1px solid var(--border)}
+.cost-detail span{font-size:.73rem;color:var(--text4)}
+.cost-red{color:var(--red)!important}
+.cost-green{color:var(--green)!important}
+.cost-green-lbl .cost-lbl{color:var(--green)}
+
+.voce-nascosta .cost-lbl{color:var(--red);font-weight:500}
+.voce-nascosta .cost-detail span{color:rgba(239,68,68,.65)}
+.voce-nascosta-bg{background:rgba(239,68,68,.06);border-radius:3px;padding:2px 4px;margin:-2px -4px}
+
+.cost-total{display:flex;justify-content:space-between;font-weight:700;padding:9px 0 0;margin-top:6px;font-size:.95rem;border-top:2px solid}
+.cost-total-red{color:var(--red);border-color:rgba(239,68,68,.25)}
+.cost-total-green{color:var(--green);border-color:rgba(16,185,129,.25)}
+
+/* ── Freccia centrale ────────────────────────────────────────────────────── */
+.arr-col{display:flex;align-items:center;justify-content:center}
+.arr-box{text-align:center;background:rgba(16,185,129,.09);border:1px solid rgba(16,185,129,.25);border-radius:var(--radius);padding:10px 8px;width:100%}
+.arr-lbl{font-size:.68rem;color:var(--text3);margin-bottom:3px}
+.arr-val{font-size:1rem;font-weight:700;color:var(--green);line-height:1.2}
+.arr-pct{font-size:.75rem;color:var(--accent2);margin:2px 0}
+.arr-ico{font-size:1.3rem;color:var(--green);margin-top:5px}
+
+/* ── Breakdown risparmio ─────────────────────────────────────────────────── */
+.risp-box{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:14px}
+.risp-title{font-weight:600;font-size:.87rem;color:var(--text2);margin-bottom:10px}
+.risp-grid{display:grid;grid-template-columns:1fr auto auto;gap:0 16px}
+.risp-hdr{font-size:.75rem;color:var(--text3);font-weight:500;padding:0 0 6px;border-bottom:1px solid var(--border2)}
+.risp-hdr:nth-child(2),.risp-hdr:nth-child(3){text-align:right}
+.risp-r{contents}
+.risp-cell{font-size:.84rem;color:var(--text2);padding:7px 0;border-bottom:1px solid var(--border)}
+.risp-val{font-weight:600;font-size:.85rem;text-align:right;padding:7px 0;border-bottom:1px solid var(--border)}
+.risp-mese{font-size:.79rem;color:var(--text3);text-align:right;padding:7px 0;border-bottom:1px solid var(--border)}
+.risp-pos{color:var(--green)!important}
+.risp-neg{color:var(--red)!important}
+.risp-voci-row .risp-cell{color:var(--orange);font-weight:500}
+.risp-voci-bg{background:rgba(245,158,11,.07);border-radius:3px;padding:2px 4px;margin:-2px -4px}
+.risp-tot-row .risp-cell{color:var(--green);font-weight:700;font-size:.88rem;border-bottom:none}
+.risp-tot-row .risp-val{border-bottom:none;font-size:.9rem}
+.risp-tot-row .risp-mese{border-bottom:none;color:var(--green);font-weight:600}
+.risp-tot-bg{background:rgba(16,185,129,.08);border-radius:3px;padding:3px 6px;margin:-3px -6px}
+</style>
+
+<div class="pros-wrap">
+  <div class="pros-page-hdr">
+    <div class="pros-page-icon">📄</div>
+    <div>
+      <h1>Prospetto Cliente</h1>
+      <div class="pros-page-sub">Prepara un'analisi di risparmio personalizzata da presentare al cliente</div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════ FORM ══════════════════════════════════ -->
+  <form method="POST" action="/prospetto" id="prosForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <!-- Cliente -->
+    <div class="pros-card">
+      <div class="pros-card-hdr">👤 Dati cliente</div>
+      <div class="pros-card-body">
+        <div class="pros-row">
+          <div class="pros-group" style="flex:2">
+            <label class="pros-label">Nome cliente *</label>
+            <input type="text" name="nome_cliente" class="pros-input"
+                   value="{{ form_data.nome_cliente or '' }}"
+                   placeholder="Es. Mario Rossi · Condominio Via Roma 12" required>
+          </div>
+          <div class="pros-group" style="flex:2">
+            <label class="pros-label">Indirizzo (opzionale)</label>
+            <input type="text" name="indirizzo_cliente" class="pros-input"
+                   value="{{ form_data.indirizzo_cliente or '' }}"
+                   placeholder="Via Example 1, Milano">
+          </div>
+        </div>
+        <div class="pros-row">
+          <div class="pros-group">
+            <label class="pros-label">Commodity *</label>
+            <select name="commodity" id="commoditySelect" class="pros-input" onchange="updateUnits()">
+              <option value="LUCE" {% if (form_data.commodity or 'LUCE') == 'LUCE' %}selected{% endif %}>⚡ Elettricità (LUCE)</option>
+              <option value="GAS"  {% if form_data.commodity == 'GAS' %}selected{% endif %}>🔥 Gas naturale (GAS)</option>
+            </select>
+          </div>
+          <div class="pros-group">
+            <label class="pros-label">Consumo annuo * <span id="unitLabel" class="pros-badge">MWh/anno</span></label>
+            <input type="number" name="consumo_annuo" class="pros-input" step="0.001" min="0"
+                   value="{{ form_data.consumo_annuo if form_data.consumo_annuo else '' }}"
+                   placeholder="Es. 2.700" required>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fornitore attuale -->
+    <div class="pros-card">
+      <div class="pros-card-hdr pros-card-hdr-red">🏭 Contratto attuale — fornitore corrente</div>
+      <div class="pros-card-body">
+        <div class="pros-row">
+          <div class="pros-group" style="flex:2">
+            <label class="pros-label">Nome fornitore attuale</label>
+            <input type="text" name="nome_fornitore_attuale" class="pros-input"
+                   value="{{ form_data.nome_fornitore_attuale or '' }}"
+                   placeholder="Es. Enel Energia, A2A, Edison…">
+          </div>
+          <div class="pros-group">
+            <label class="pros-label">Spread commerciale * <span id="spreadUnitLbl" class="pros-badge">€/MWh</span></label>
+            <input type="number" name="spread_attuale" class="pros-input" step="0.0001" min="0"
+                   value="{{ form_data.spread_attuale if form_data.spread_attuale else '' }}"
+                   placeholder="Es. 15.0000" required>
+          </div>
+          <div class="pros-group">
+            <label class="pros-label">Quota fissa <span class="pros-badge">€/mese</span></label>
+            <input type="number" name="quota_fissa_attuale" class="pros-input" step="0.01" min="0"
+                   value="{{ form_data.quota_fissa_attuale if form_data.quota_fissa_attuale else '' }}"
+                   placeholder="Es. 12.00">
+          </div>
+        </div>
+
+        <!-- Voci nascoste -->
+        <div class="voci-box">
+          <div class="voci-box-hdr">
+            <span class="voci-box-title">⚠ Voci aggiuntive in bolletta</span>
+            <span class="voci-box-hint">Corrispettivi extra addebitati dal fornitore: contributi di lettura, oneri commerciali, penali, ecc.</span>
+          </div>
+          <div id="vociContainer">
+            {% for v in (form_data.voci or []) %}
+            <div class="voce-row">
+              <input type="text" name="voce_nome_{{ loop.index0 }}" class="pros-input"
+                     value="{{ v.nome }}" placeholder="Nome voce (es. Contributo lettura)">
+              <div class="voce-amt">
+                <input type="number" name="voce_euro_{{ loop.index0 }}" class="pros-input"
+                       value="{{ v.euro_mese }}" step="0.01" min="0" placeholder="0.00">
+                <span class="voce-unit">€/mese</span>
+              </div>
+              <button type="button" class="btn-del-voce" onclick="removeVoce(this)" title="Rimuovi">✕</button>
+            </div>
+            {% endfor %}
+          </div>
+          <button type="button" class="btn-add-voce" onclick="addVoce()">+ Aggiungi voce nascosta</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Offerta proposta -->
+    <div class="pros-card">
+      <div class="pros-card-hdr pros-card-hdr-green">✅ Offerta proposta</div>
+      <div class="pros-card-body">
+        <div class="pros-row">
+          <div class="pros-group">
+            <label class="pros-label">Seleziona offerta *</label>
+            <select name="offerta_id" class="pros-input" required>
+              <option value="">— Seleziona un'offerta attiva —</option>
+              {% for o in offerte %}
+              <option value="{{ o.id }}"
+                {% if form_data.offerta_id == o.id %}selected{% endif %}
+                data-commodity="{{ o.commodity }}">
+                {{ o.commodity }} · {{ o.nome_offerta }}
+                (spread {{ o.spread|n4 }} {% if o.commodity == 'LUCE' %}€/MWh{% else %}€/Smc{% endif %},
+                 QF {{ o.quota_fissa|n2 }} €/mese)
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pros-actions">
+      <button type="submit" class="btn-calc">🔍 Calcola risparmio</button>
+    </div>
+  </form>
+
+  <!-- ══════════════════════════════ RISULTATO ══════════════════════════════ -->
+  {% if risultato %}
+  <div class="ris-section" id="risultato">
+
+    <div class="ris-top">
+      <h2>Analisi per <strong>{{ risultato.nome_cliente or 'Cliente' }}</strong>
+        {% if risultato.indirizzo_cliente %}
+          <span style="font-weight:400;color:var(--text3)"> — {{ risultato.indirizzo_cliente }}</span>
+        {% endif %}
+      </h2>
+      <!-- Form nascosto per il PDF -->
+      <form method="POST" action="/export/prospetto-pdf">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="nome_cliente"           value="{{ risultato.nome_cliente }}">
+        <input type="hidden" name="indirizzo_cliente"      value="{{ risultato.indirizzo_cliente }}">
+        <input type="hidden" name="commodity"              value="{{ risultato.commodity }}">
+        <input type="hidden" name="consumo_annuo"          value="{{ risultato.consumo_annuo }}">
+        <input type="hidden" name="nome_fornitore_attuale" value="{{ risultato.nome_fornitore_attuale }}">
+        <input type="hidden" name="spread_attuale"         value="{{ risultato.spread_attuale }}">
+        <input type="hidden" name="quota_fissa_attuale"    value="{{ risultato.quota_fissa_attuale }}">
+        {% for v in risultato.voci %}
+        <input type="hidden" name="voce_nome_{{ loop.index0 }}" value="{{ v.nome }}">
+        <input type="hidden" name="voce_euro_{{ loop.index0 }}" value="{{ v.euro_mese }}">
+        {% endfor %}
+        <input type="hidden" name="offerta_id" value="{{ risultato.offerta_id }}">
+        <button type="submit" class="btn-pdf">📄 Scarica PDF cliente</button>
+      </form>
+    </div>
+
+    {% set unit = 'MWh' if risultato.commodity == 'LUCE' else 'Smc' %}
+
+    <!-- Confronto affiancato -->
+    <div class="conf-cols">
+
+      <!-- Colonna: fornitore attuale -->
+      <div class="col-att">
+        <div class="col-title col-title-red">🏭 {{ risultato.nome_fornitore_attuale or 'Fornitore attuale' }}</div>
+
+        <div class="cost-row">
+          <span class="cost-lbl">Energia — spread</span>
+          <span class="cost-val cost-red">{{ risultato.costo_spread_att|n2 }} €</span>
+        </div>
+        <div class="cost-row cost-detail">
+          <span>{{ risultato.spread_attuale|n4 }} €/{{ unit }} × {{ risultato.consumo_annuo|n0 }} {{ unit }}</span>
+        </div>
+
+        <div class="cost-row">
+          <span class="cost-lbl">Quota fissa</span>
+          <span class="cost-val cost-red">{{ risultato.costo_qf_att|n2 }} €</span>
+        </div>
+        <div class="cost-row cost-detail">
+          <span>{{ risultato.quota_fissa_attuale|n2 }} €/mese × 12</span>
+        </div>
+
+        {% for v in risultato.voci %}
+        <div class="cost-row voce-nascosta">
+          <span class="cost-lbl"><span class="voce-nascosta-bg">⚠ {{ v.nome }}</span></span>
+          <span class="cost-val cost-red">{{ (v.euro_mese * 12)|n2 }} €</span>
+        </div>
+        <div class="cost-row cost-detail voce-nascosta">
+          <span style="color:rgba(239,68,68,.6)">{{ v.euro_mese|n2 }} €/mese × 12 — voce non trasparente</span>
+        </div>
+        {% endfor %}
+
+        <div class="cost-total cost-total-red">
+          <span>Totale annuo</span>
+          <span>{{ risultato.totale_att|n2 }} €</span>
+        </div>
+      </div>
+
+      <!-- Freccia -->
+      <div class="arr-col">
+        <div class="arr-box">
+          <div class="arr-lbl">Risparmi</div>
+          <div class="arr-val">{{ risultato.risp_tot|n2 }} €</div>
+          <div class="arr-pct">{{ risultato.risp_pct|n1 }}%</div>
+          <div class="arr-ico">→</div>
+        </div>
+      </div>
+
+      <!-- Colonna: nuova offerta -->
+      <div class="col-nuova">
+        <div class="col-title col-title-green">✅ {{ risultato.offerta.nome_offerta }}</div>
+
+        <div class="cost-row">
+          <span class="cost-lbl">Energia — spread</span>
+          <span class="cost-val cost-green">{{ risultato.costo_spread_n|n2 }} €</span>
+        </div>
+        <div class="cost-row cost-detail">
+          <span>{{ risultato.spread_n|n4 }} €/{{ unit }} × {{ risultato.consumo_annuo|n0 }} {{ unit }}</span>
+        </div>
+
+        <div class="cost-row">
+          <span class="cost-lbl">Quota fissa</span>
+          <span class="cost-val cost-green">{{ risultato.costo_qf_n|n2 }} €</span>
+        </div>
+        <div class="cost-row cost-detail">
+          <span>{{ risultato.qf_n|n2 }} €/mese × 12</span>
+        </div>
+
+        <div class="cost-row cost-green-lbl">
+          <span class="cost-lbl">Nessuna voce nascosta</span>
+          <span class="cost-val cost-green">0,00 €</span>
+        </div>
+        <div class="cost-row cost-detail">
+          <span style="color:rgba(16,185,129,.7)">Prezzo tutto incluso e trasparente</span>
+        </div>
+
+        <div class="cost-total cost-total-green">
+          <span>Totale annuo</span>
+          <span>{{ risultato.totale_n|n2 }} €</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Breakdown risparmio -->
+    <div class="risp-box">
+      <div class="risp-title">Dettaglio risparmio</div>
+      <div class="risp-grid">
+        <div class="risp-hdr">Componente</div>
+        <div class="risp-hdr">Risparmio annuo</div>
+        <div class="risp-hdr">Al mese</div>
+
+        <!-- Spread -->
+        <div class="risp-cell">Su energia (spread)</div>
+        <div class="risp-val {% if risultato.risp_spread >= 0 %}risp-pos{% else %}risp-neg{% endif %}">
+          {{ risultato.risp_spread|n2 }} €
+        </div>
+        <div class="risp-mese">{{ (risultato.risp_spread / 12)|n2 }} €</div>
+
+        <!-- Quota fissa -->
+        <div class="risp-cell">Su quota fissa</div>
+        <div class="risp-val {% if risultato.risp_qf >= 0 %}risp-pos{% else %}risp-neg{% endif %}">
+          {{ risultato.risp_qf|n2 }} €
+        </div>
+        <div class="risp-mese">{{ (risultato.risp_qf / 12)|n2 }} €</div>
+
+        {% if risultato.risp_voci > 0 %}
+        <!-- Voci nascoste -->
+        <div class="risp-cell risp-voci-row"><span class="risp-voci-bg">⚠ Voci nascoste eliminate</span></div>
+        <div class="risp-val risp-pos risp-voci-row">{{ risultato.risp_voci|n2 }} €</div>
+        <div class="risp-mese risp-voci-row">{{ (risultato.risp_voci / 12)|n2 }} €</div>
+        {% endif %}
+
+        <!-- Totale -->
+        <div class="risp-cell risp-tot-row">
+          <span class="risp-tot-bg">TOTALE ({{ risultato.risp_pct|n1 }}% del costo attuale)</span>
+        </div>
+        <div class="risp-val risp-pos risp-tot-row">
+          <span class="risp-tot-bg">{{ risultato.risp_tot|n2 }} €/anno</span>
+        </div>
+        <div class="risp-mese risp-tot-row risp-pos">
+          <span class="risp-tot-bg">{{ risultato.risp_mensile|n2 }} €/mese</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /ris-section -->
+  {% endif %}
+
+</div><!-- /pros-wrap -->
+
+<script>
+let _voceIdx = {{ (form_data.voci|length) if form_data.voci else 0 }};
+
+function updateUnits() {
+  const c  = document.getElementById('commoditySelect').value;
+  document.getElementById('unitLabel').textContent    = c === 'LUCE' ? 'MWh/anno' : 'Smc/anno';
+  document.getElementById('spreadUnitLbl').textContent = c === 'LUCE' ? '€/MWh'    : '€/Smc';
+}
+
+function addVoce() {
+  const i   = _voceIdx++;
+  const div = document.createElement('div');
+  div.className = 'voce-row';
+  div.innerHTML = `
+    <input type="text"   name="voce_nome_${i}" class="pros-input" placeholder="Nome voce (es. Contributo lettura)">
+    <div class="voce-amt">
+      <input type="number" name="voce_euro_${i}" class="pros-input" step="0.01" min="0" placeholder="0.00">
+      <span class="voce-unit">€/mese</span>
+    </div>
+    <button type="button" class="btn-del-voce" onclick="removeVoce(this)" title="Rimuovi">✕</button>
+  `;
+  document.getElementById('vociContainer').appendChild(div);
+}
+
+function removeVoce(btn) { btn.closest('.voce-row').remove(); }
+
+// Scroll al risultato dopo submit
+{% if risultato %}
+document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('risultato');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+{% endif %}
+</script>
+{% endblock %}
