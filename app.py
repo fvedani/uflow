@@ -1,4 +1,4 @@
-import os, io, csv, secrets
+import os, io, csv, secrets, json
 from datetime import datetime
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, flash, abort, session
@@ -371,6 +371,26 @@ def init_db():
             fonte TEXT DEFAULT 'GME',
             aggiornato_il TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
             UNIQUE(commodity, anno, mese)
+        );
+        CREATE TABLE IF NOT EXISTS prospetti (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            nome_cliente TEXT NOT NULL,
+            indirizzo_cliente TEXT DEFAULT '',
+            commodity TEXT NOT NULL,
+            consumo_annuo REAL NOT NULL,
+            nome_fornitore_attuale TEXT DEFAULT '',
+            spread_attuale REAL DEFAULT 0,
+            quota_fissa_attuale REAL DEFAULT 0,
+            voci_json TEXT DEFAULT '[]',
+            offerta_id INTEGER,
+            nome_offerta TEXT DEFAULT '',
+            totale_att REAL DEFAULT 0,
+            totale_n REAL DEFAULT 0,
+            risp_tot REAL DEFAULT 0,
+            risp_pct REAL DEFAULT 0,
+            created_at TEXT DEFAULT to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS'),
+            FOREIGN KEY(user_id) REFERENCES utenti(id)
         )
         ''')
         for email in ADMIN_EMAILS:
@@ -3464,6 +3484,7 @@ def prospetto():
 
     risultato = None
     form_data = {}
+    prospetto_salvato_id = None
 
     if request.method == 'POST':
         d = _calcola_prospetto(request.form)
@@ -3487,6 +3508,7 @@ def prospetto():
             risp_qf     = d['costo_qf_att']     - costo_qf_n
             risp_voci   = d['costo_voci']
             risp_tot    = risp_spread + risp_qf + risp_voci
+            risp_pct    = (risp_tot / d['totale_att'] * 100) if d['totale_att'] > 0 else 0
 
             risultato = {
                 **d,
@@ -3502,47 +3524,48 @@ def prospetto():
                 'risp_voci':     risp_voci,
                 'risp_tot':      risp_tot,
                 'risp_mensile':  risp_tot / 12,
-                'risp_pct':      (risp_tot / d['totale_att'] * 100) if d['totale_att'] > 0 else 0,
+                'risp_pct':      risp_pct,
             }
 
+            # Auto-salvataggio prospetto nel DB
+            with get_db() as db:
+                cur = db.execute(
+                    '''INSERT INTO prospetti
+                       (user_id, nome_cliente, indirizzo_cliente, commodity, consumo_annuo,
+                        nome_fornitore_attuale, spread_attuale, quota_fissa_attuale, voci_json,
+                        offerta_id, nome_offerta, totale_att, totale_n, risp_tot, risp_pct)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                    [current_user.id,
+                     d['nome_cliente'], d['indirizzo_cliente'], d['commodity'], d['consumo_annuo'],
+                     d['nome_fornitore_attuale'], d['spread_attuale'], d['quota_fissa_attuale'],
+                     json.dumps(d['voci'], ensure_ascii=False),
+                     offerta_id, offerta_sel.get('nome_offerta', ''),
+                     d['totale_att'], totale_n, risp_tot, risp_pct]
+                )
+                db.commit()
+                prospetto_salvato_id = cur.lastrowid
+
         form_data = {**d, 'offerta_id': offerta_id}
+
+    # Carica archivio prospetti recenti
+    with get_db() as db:
+        archivio_rows = db.execute(
+            f'SELECT * FROM prospetti {aw} ORDER BY created_at DESC LIMIT 50', ap
+        ).fetchall()
+    archivio = [dict(r) for r in archivio_rows]
 
     return render_template('prospetto.html',
                            offerte=offerte,
                            risultato=risultato,
-                           form_data=form_data)
+                           form_data=form_data,
+                           archivio=archivio,
+                           prospetto_salvato_id=prospetto_salvato_id)
 
 
-@app.route('/export/prospetto-pdf', methods=['POST'])
-@login_required
-def export_prospetto_pdf():
-    anda, andp = uid_and()
-    d = _calcola_prospetto(request.form)
-    offerta_id = request.form.get('offerta_id', type=int)
-    offerta_sel = None
-    if offerta_id:
-        with get_db() as db:
-            row = db.execute(f'SELECT * FROM offerte WHERE id=? {anda}',
-                             [offerta_id] + andp).fetchone()
-        if row:
-            offerta_sel = dict(row)
-
-    if not offerta_sel or d['consumo_annuo'] <= 0:
-        abort(400)
-
-    spread_n       = float(offerta_sel.get('spread') or 0)
-    qf_n           = float(offerta_sel.get('quota_fissa') or 0)
-    costo_spread_n = spread_n * d['consumo_annuo']
-    costo_qf_n     = qf_n * 12
-    totale_n       = costo_spread_n + costo_qf_n
-    risp_spread    = d['costo_spread_att'] - costo_spread_n
-    risp_qf        = d['costo_qf_att']     - costo_qf_n
-    risp_voci      = d['costo_voci']
-    risp_tot       = risp_spread + risp_qf + risp_voci
-    risp_mensile   = risp_tot / 12
-    risp_pct       = (risp_tot / d['totale_att'] * 100) if d['totale_att'] > 0 else 0
-    unit           = 'MWh' if d['commodity'] == 'LUCE' else 'Smc'
-
+def _genera_prospetto_pdf(d, offerta_sel, spread_n, qf_n,
+                          costo_spread_n, costo_qf_n, totale_n,
+                          risp_spread, risp_qf, risp_voci,
+                          risp_tot, risp_mensile, risp_pct, unit):
     # ── Palette ──────────────────────────────────────────────────────────────
     C_WHITE  = colors.white
     C_BG     = colors.HexColor('#F8FAFC')
@@ -3789,6 +3812,116 @@ def export_prospetto_pdf():
     safe_name = (d['nome_cliente'] or 'cliente').replace(' ', '_').replace('/', '-')
     fname = f"prospetto_{safe_name}_{datetime.now().strftime('%Y%m%d')}.pdf"
     return send_file(buf, as_attachment=True, download_name=fname, mimetype='application/pdf')
+
+
+@app.route('/export/prospetto-pdf', methods=['POST'])
+@login_required
+def export_prospetto_pdf():
+    anda, andp = uid_and()
+    d = _calcola_prospetto(request.form)
+    offerta_id = request.form.get('offerta_id', type=int)
+    offerta_sel = None
+    if offerta_id:
+        with get_db() as db:
+            row = db.execute(f'SELECT * FROM offerte WHERE id=? {anda}',
+                             [offerta_id] + andp).fetchone()
+        if row:
+            offerta_sel = dict(row)
+
+    if not offerta_sel or d['consumo_annuo'] <= 0:
+        abort(400)
+
+    spread_n       = float(offerta_sel.get('spread') or 0)
+    qf_n           = float(offerta_sel.get('quota_fissa') or 0)
+    costo_spread_n = spread_n * d['consumo_annuo']
+    costo_qf_n     = qf_n * 12
+    totale_n       = costo_spread_n + costo_qf_n
+    risp_spread    = d['costo_spread_att'] - costo_spread_n
+    risp_qf        = d['costo_qf_att']     - costo_qf_n
+    risp_voci      = d['costo_voci']
+    risp_tot       = risp_spread + risp_qf + risp_voci
+    risp_mensile   = risp_tot / 12
+    risp_pct       = (risp_tot / d['totale_att'] * 100) if d['totale_att'] > 0 else 0
+    unit           = 'MWh' if d['commodity'] == 'LUCE' else 'Smc'
+    return _genera_prospetto_pdf(d, offerta_sel, spread_n, qf_n,
+                                 costo_spread_n, costo_qf_n, totale_n,
+                                 risp_spread, risp_qf, risp_voci,
+                                 risp_tot, risp_mensile, risp_pct, unit)
+
+
+@app.route('/prospetti/<int:pid>/pdf')
+@login_required
+def prospetto_pdf_da_archivio(pid):
+    anda, andp = uid_and()
+    with get_db() as db:
+        row = db.execute(f'SELECT * FROM prospetti WHERE id=? {anda}',
+                         [pid] + andp).fetchone()
+    if not row:
+        abort(404)
+    p = dict(row)
+
+    voci = json.loads(p.get('voci_json') or '[]')
+    spread_att = float(p.get('spread_attuale') or 0)
+    qf_att     = float(p.get('quota_fissa_attuale') or 0)
+    consumo    = float(p['consumo_annuo'])
+    d = {
+        'nome_cliente':           p['nome_cliente'],
+        'indirizzo_cliente':      p.get('indirizzo_cliente', ''),
+        'commodity':              p['commodity'],
+        'consumo_annuo':          consumo,
+        'nome_fornitore_attuale': p.get('nome_fornitore_attuale', ''),
+        'spread_attuale':         spread_att,
+        'quota_fissa_attuale':    qf_att,
+        'voci':                   voci,
+        'costo_spread_att':       spread_att * consumo,
+        'costo_qf_att':           qf_att * 12,
+        'costo_voci':             sum(v.get('euro_mese', 0) * 12 for v in voci),
+        'totale_att':             float(p.get('totale_att') or 0),
+    }
+
+    offerta_id = p.get('offerta_id')
+    offerta_sel = None
+    if offerta_id:
+        anda2, andp2 = uid_and()
+        with get_db() as db:
+            orow = db.execute(f'SELECT * FROM offerte WHERE id=? {anda2}',
+                              [offerta_id] + andp2).fetchone()
+        if orow:
+            offerta_sel = dict(orow)
+
+    # Snapshot: ricostruisce i valori nuova offerta dai dati salvati
+    totale_n  = float(p.get('totale_n') or 0)
+    risp_tot  = float(p.get('risp_tot') or 0)
+    risp_pct  = float(p.get('risp_pct') or 0)
+    if offerta_sel:
+        spread_n       = float(offerta_sel.get('spread') or 0)
+        qf_n           = float(offerta_sel.get('quota_fissa') or 0)
+    else:
+        # Offerta non più disponibile: ricalcola da totali salvati
+        spread_n = 0.0
+        qf_n     = 0.0
+        offerta_sel = {'nome_offerta': p.get('nome_offerta', '(offerta eliminata)')}
+    costo_spread_n = spread_n * consumo
+    costo_qf_n     = qf_n * 12
+    risp_spread    = d['costo_spread_att'] - costo_spread_n
+    risp_qf        = d['costo_qf_att']     - costo_qf_n
+    risp_voci      = d['costo_voci']
+    risp_mensile   = risp_tot / 12
+    unit           = 'MWh' if d['commodity'] == 'LUCE' else 'Smc'
+    return _genera_prospetto_pdf(d, offerta_sel, spread_n, qf_n,
+                                 costo_spread_n, costo_qf_n, totale_n,
+                                 risp_spread, risp_qf, risp_voci,
+                                 risp_tot, risp_mensile, risp_pct, unit)
+
+
+@app.route('/prospetti/<int:pid>/elimina', methods=['POST'])
+@login_required
+def elimina_prospetto(pid):
+    anda, andp = uid_and()
+    with get_db() as db:
+        db.execute(f'DELETE FROM prospetti WHERE id=? {anda}', [pid] + andp)
+        db.commit()
+    return redirect(url_for('prospetto'))
 
 
 if __name__ == '__main__':

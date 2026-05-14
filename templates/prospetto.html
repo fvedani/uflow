@@ -45,6 +45,34 @@ select.pros-input{cursor:pointer}
 .btn-calc{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:10px 26px;font-weight:600;font-size:.9rem;cursor:pointer;font-family:var(--font)}
 .btn-calc:hover{background:var(--accent2)}
 
+/* ── Notifica salvataggio ───────────────────────────────────────────────── */
+.pros-saved-banner{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--green);font-weight:500;margin-bottom:1rem}
+
+/* ── Archivio ────────────────────────────────────────────────────────────── */
+.arch-section{margin-top:2rem}
+.arch-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+.arch-hdr h2{font-size:1rem;font-weight:700;margin:0;color:var(--text)}
+.arch-count{font-size:.78rem;color:var(--text3)}
+.arch-table{width:100%;border-collapse:collapse;font-size:.84rem}
+.arch-table th{text-align:left;font-size:.75rem;color:var(--text3);font-weight:500;padding:6px 10px;border-bottom:2px solid var(--border);white-space:nowrap}
+.arch-table th:last-child{text-align:right}
+.arch-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text2)}
+.arch-table tr:last-child td{border-bottom:none}
+.arch-table tr:hover td{background:var(--bg3)}
+.arch-nome{font-weight:600;color:var(--text)}
+.arch-sub{font-size:.77rem;color:var(--text3);margin-top:2px}
+.arch-badge{display:inline-block;padding:1px 6px;border-radius:99px;font-size:.71rem;font-weight:600}
+.arch-badge-luce{background:rgba(59,130,246,.12);color:#3B82F6}
+.arch-badge-gas{background:rgba(245,158,11,.12);color:#D97706}
+.arch-risp{font-weight:700;color:var(--green)}
+.arch-risp-neg{color:var(--red)}
+.arch-actions{display:flex;gap:6px;justify-content:flex-end}
+.btn-arch-pdf{background:rgba(239,68,68,.09);border:1px solid rgba(239,68,68,.22);color:var(--red);padding:5px 11px;border-radius:var(--radius-sm);font-size:.78rem;font-weight:600;cursor:pointer;text-decoration:none;font-family:var(--font);white-space:nowrap}
+.btn-arch-pdf:hover{background:rgba(239,68,68,.2)}
+.btn-arch-del{background:transparent;border:1px solid var(--border2);color:var(--text3);padding:5px 8px;border-radius:var(--radius-sm);font-size:.78rem;cursor:pointer;font-family:var(--font)}
+.btn-arch-del:hover{border-color:var(--red);color:var(--red);background:rgba(239,68,68,.07)}
+.arch-empty{text-align:center;padding:28px;color:var(--text4);font-size:.85rem}
+
 /* ── Risultato ───────────────────────────────────────────────────────────── */
 .ris-section{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:1.5rem}
 .ris-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
@@ -392,6 +420,79 @@ select.pros-input{cursor:pointer}
     </div>
 
   </div><!-- /ris-section -->
+  {% endif %}
+
+  <!-- ══════════════════════════════ BANNER SALVATAGGIO ════════════════════ -->
+  {% if prospetto_salvato_id %}
+  <div class="pros-saved-banner">
+    ✅ Prospetto salvato nell'archivio — puoi scaricarlo di nuovo in qualsiasi momento.
+  </div>
+  {% endif %}
+
+  <!-- ══════════════════════════════ ARCHIVIO ══════════════════════════════ -->
+  {% if archivio %}
+  <div class="arch-section">
+    <div class="arch-hdr">
+      <h2>Archivio prospetti</h2>
+      <span class="arch-count">{{ archivio|length }} prospett{{ 'o' if archivio|length == 1 else 'i' }} salvat{{ 'o' if archivio|length == 1 else 'i' }}</span>
+    </div>
+    <div class="pros-card" style="overflow:hidden">
+      <table class="arch-table">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Offerta proposta</th>
+            <th>Risparmio annuo</th>
+            <th>Data</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in archivio %}
+          <tr>
+            <td>
+              <div class="arch-nome">{{ p.nome_cliente }}</div>
+              <div class="arch-sub">
+                <span class="arch-badge {% if p.commodity == 'LUCE' %}arch-badge-luce{% else %}arch-badge-gas{% endif %}">{{ p.commodity }}</span>
+                {{ p.consumo_annuo|n0 }} {% if p.commodity == 'LUCE' %}MWh{% else %}Smc{% endif %}
+                {% if p.nome_fornitore_attuale %} · da {{ p.nome_fornitore_attuale }}{% endif %}
+              </div>
+            </td>
+            <td>{{ p.nome_offerta or '—' }}</td>
+            <td>
+              <span class="arch-risp{% if p.risp_tot < 0 %}-neg{% endif %}">
+                {{ p.risp_tot|n2 }} €
+              </span>
+              <div style="font-size:.74rem;color:var(--text3)">{{ p.risp_pct|n1 }}%</div>
+            </td>
+            <td style="white-space:nowrap;color:var(--text3)">
+              {{ p.created_at[:10] if p.created_at else '—' }}
+            </td>
+            <td>
+              <div class="arch-actions">
+                <a href="/prospetti/{{ p.id }}/pdf" class="btn-arch-pdf">📄 PDF</a>
+                <form method="POST" action="/prospetti/{{ p.id }}/elimina"
+                      onsubmit="return confirm('Eliminare il prospetto di {{ p.nome_cliente }}?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button type="submit" class="btn-arch-del" title="Elimina">✕</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="arch-section">
+    <div class="arch-hdr">
+      <h2>Archivio prospetti</h2>
+    </div>
+    <div class="pros-card">
+      <div class="arch-empty">Nessun prospetto salvato. Calcola il tuo primo prospetto per vederlo qui.</div>
+    </div>
+  </div>
   {% endif %}
 
 </div><!-- /pros-wrap -->
